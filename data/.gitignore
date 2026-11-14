@@ -1,3 +1,5 @@
 # Archivos intermedios del pipeline (se regeneran)
 intermedio/
 .venv/
+# A1 de América (~700 MB): se publica como archivo del release datos-v1, no en git
+salida/detecciones.parquet

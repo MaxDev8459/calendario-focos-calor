@@ -24,11 +24,18 @@ MALLA_FINA = 0.01      # ~1 km: unidad de conteo (celdas-día con fuego)
 MALLA_CONSULTA = 0.1   # cuadro de consulta del contrato (ty, tx)
 
 # Umbrales del factor (ver docs del método en 03_armonizar.py)
-MIN_MODIS_MES = 10     # un mes nacional entra a la calibración si MODIS tiene ≥ 10 celdas-día
+MIN_CELDAS_MES = 10    # un mes nacional calibra si MODIS y VIIRS tienen ≥ 10 celdas-día cada uno
+                       # (en meses casi sin fuego dominan las falsas alarmas diurnas de MODIS)
 MIN_ANIOS_MES = 4      # un factor mensual necesita ≥ 4 años válidos; si no, se usa el del país
 MIN_MESES_PAIS = 12    # el factor del país necesita ≥ 12 meses válidos; si no, se usa el de América
 
 CARPETA_TRABAJO = "intermedio"
+
+VERSION_CONTRATO = "0.3"
+# A1 (detecciones.parquet, ~700 MB) no cabe en git: se publica como archivo de un release
+RELEASE_DATOS = "datos-v1"
+URL_DETECCIONES = ("https://github.com/MaxDev8459/calendario-focos-calor/releases/download/"
+                   f"{RELEASE_DATOS}/detecciones.parquet")
 
 
 def clave(anio, mes):
@@ -97,12 +104,12 @@ def meses_calibracion(totales):
     """Meses nacionales del periodo de traslape (feb-2012 a dic-2025) aptos para calibrar.
 
     totales: DataFrame con anio, mes, modis, viirs (celdas-día con fuego del país, meses completos).
-    Devuelve las filas con MODIS ≥ MIN_MODIS_MES y la columna r = viirs / modis.
+    Devuelve las filas con MODIS y VIIRS ≥ MIN_CELDAS_MES y la columna r = viirs / modis.
     """
     return (totales
             .filter((clave(pl.col("anio"), pl.col("mes")) >= CLAVE_CAMBIO)
                     & (clave(pl.col("anio"), pl.col("mes")) <= CLAVE_FIN)
-                    & (pl.col("modis") >= MIN_MODIS_MES) & pl.col("viirs").is_not_null())
+                    & (pl.col("modis") >= MIN_CELDAS_MES) & (pl.col("viirs") >= MIN_CELDAS_MES))
             .with_columns((pl.col("viirs") / pl.col("modis")).alias("r")))
 
 
@@ -177,7 +184,11 @@ def validar_dejando_un_anio(totales, factores_america=None):
             real.append(v)
     val = metricas(pred, real)
     if val is None:
-        return {"tipo": "dejar_un_anio_fuera", "nota": "datos insuficientes para validar"}
+        # mismas claves con null: el país usa el factor de América y no tiene meses para validar
+        return {"tipo": "dejar_un_anio_fuera", "error_medio_pct": None, "error_ponderado_pct": None,
+                "sesgo_pct": None, "r": None, "meses_validados": len(real),
+                "error_medio_pct_factor_unico": None, "error_ponderado_pct_factor_unico": None,
+                "nota": "datos insuficientes para validar"}
     base = metricas(pred_unico, real)
     return {"tipo": "dejar_un_anio_fuera", **val,
             "error_medio_pct_factor_unico": base["error_medio_pct"] if base else None,

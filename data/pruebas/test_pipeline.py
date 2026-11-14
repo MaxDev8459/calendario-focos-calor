@@ -60,10 +60,39 @@ def test_respaldo_factor_de_america_si_el_pais_no_tiene_fuego():
     assert set(origen.values()) == {"america_mes"} and f["1"] == 5.0
 
 
+def test_mes_con_falsas_alarmas_de_modis_no_calibra():
+    # como El Salvador en septiembre: MODIS ve 20 celdas-día y VIIRS solo 3 → no es fuego real
+    t = totales(lambda m: 4).with_columns(
+        pl.when(pl.col("mes") == 9).then(20).otherwise(pl.col("modis")).alias("modis"),
+        pl.when(pl.col("mes") == 9).then(3).otherwise(pl.col("viirs")).alias("viirs"))
+    f, origen = comun.calcular_factores(t)
+    assert origen["9"] == "pais" and f["9"] == pytest.approx(4)
+
+
+def test_quita_fuentes_persistentes_pero_no_incendios():
+    limpiar = cargar("01_limpiar")
+    filas = []
+    for anio in (2015, 2016):
+        for mes in range(1, 13):                          # refinería: arde todo el año
+            filas.append((date(anio, mes, 5), 10.215, -61.635))
+        for dia in range(1, 29):                          # incendio grande: un mes, muchos días
+            filas.append((date(anio, 4, dia), 18.705, -99.105))
+    det = pl.DataFrame(filas, schema=["fecha", "lat", "lon"], orient="row")
+    limpio, quitadas = limpiar.quitar_persistentes(det)
+    assert quitadas.height == 1
+    assert limpio["lat"].unique().to_list() == [18.705]
+
+
 def test_validacion_con_factor_perfecto_da_error_cero_y_supera_al_factor_unico():
     v = comun.validar_dejando_un_anio(totales(lambda m: 2 + m / 2, modis=1000))
     assert v["error_medio_pct"] == 0 and v["r"] == pytest.approx(1)
     assert v["error_medio_pct_factor_unico"] > 10
+
+
+def test_pais_sin_datos_para_validar_trae_las_mismas_claves_en_null():
+    v = comun.validar_dejando_un_anio(totales(lambda m: 3, modis=2))
+    for k in ("error_medio_pct", "sesgo_pct", "r"):
+        assert k in v and v[k] is None
 
 
 def test_malla_cuenta_celdas_dia_no_focos():

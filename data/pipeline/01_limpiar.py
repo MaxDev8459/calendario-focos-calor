@@ -5,7 +5,11 @@ Filtros (reglas de Datos):
   - confianza: MODIS ≥ 30, VIIRS 'n' o 'h' (se quitan las bajas);
   - MODIS solo Aqua: pasa a la misma hora local que S-NPP (≈ 13:30 y 01:30), así el
     cociente VIIRS/MODIS mide la diferencia de sensor y no la de horario;
-  - desde julio de 2002 (inicio de Aqua) hasta el fin del periodo.
+  - desde julio de 2002 (inicio de Aqua) hasta el fin del periodo;
+  - sin fuentes de calor persistentes: celdas de 0.01° activas en ≥ 8 meses distintos de un mismo
+    año, en al menos 2 años (refinerías, quemadores de gas, industria que FIRMS no marcó como
+    type 2). Un incendio o una quema agrícola no se repite 8 meses al año en el mismo kilómetro.
+    Quita < 1 % de las celdas-día en casi todos los países; la lista queda en persistentes.parquet.
 
 Uso, desde data/:
     python pipeline/01_limpiar.py --crudo ../../../data/crudo --pais Mexico
@@ -15,7 +19,10 @@ import time
 
 import polars as pl
 
-from comun import CLAVE_FIN, CLAVE_INICIO, argumentos, clave, lista_paises, paises_disponibles, ruta
+from comun import CLAVE_FIN, CLAVE_INICIO, MALLA_FINA, argumentos, clave, lista_paises, paises_disponibles, ruta
+
+PERSISTENTE_MESES = 8   # meses distintos con fuego en un mismo año
+PERSISTENTE_ANIOS = 2   # años que cumplen lo anterior
 
 COLUMNAS = ["acq_date", "acq_time", "latitude", "longitude", "sensor", "satelite", "confianza", "frp", "daynight"]
 
@@ -56,18 +63,31 @@ def limpiar(crudo, pais):
            .with_columns((pl.col("lat") / 0.1).floor().cast(pl.Int32).alias("ty"),
                          (pl.col("lon") / 0.1).floor().cast(pl.Int32).alias("tx"))
            .sort("fecha", "hora_utc"))
-    return det.collect()
+    return quitar_persistentes(det.collect())
+
+
+def quitar_persistentes(det):
+    """Devuelve (detecciones sin fuentes persistentes, celdas quitadas)."""
+    fina = [(pl.col("lat") / MALLA_FINA).floor().cast(pl.Int32).alias("fy"),
+            (pl.col("lon") / MALLA_FINA).floor().cast(pl.Int32).alias("fx")]
+    meses = (det.select(*fina, pl.col("fecha").dt.year().alias("anio"), pl.col("fecha").dt.month().alias("mes"))
+             .unique().group_by("fy", "fx", "anio").len())
+    persistentes = (meses.filter(pl.col("len") >= PERSISTENTE_MESES).group_by("fy", "fx").len()
+                    .filter(pl.col("len") >= PERSISTENTE_ANIOS).select("fy", "fx"))
+    limpio = det.with_columns(*fina).join(persistentes, on=["fy", "fx"], how="anti").drop("fy", "fx")
+    return limpio, persistentes
 
 
 def main():
     a = argumentos("Limpia los CSV de FIRMS por país", crudo=True)
     for pais in lista_paises(a.pais, paises_disponibles(a.crudo)):
         t = time.perf_counter()
-        det = limpiar(a.crudo, pais)
+        det, persistentes = limpiar(a.crudo, pais)
         det.write_parquet(ruta(a.trabajo, pais, "detecciones.parquet"), compression="zstd")
+        persistentes.write_parquet(ruta(a.trabajo, pais, "persistentes.parquet"))
         n = dict(det.group_by("sensor").len().iter_rows())
         print(f"{pais:<34} MODIS-Aqua {n.get('MODIS', 0):>10,}  VIIRS {n.get('VIIRS', 0):>11,}  "
-              f"({time.perf_counter() - t:.1f} s)")
+              f"celdas persistentes quitadas {persistentes.height:>4}  ({time.perf_counter() - t:.1f} s)")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ Para cada año del traslape (2012–2025): se calculan los factores SIN ese año
 VIIRS ≈ MODIS × factor en sus meses y se compara con el VIIRS real. Así el método se prueba
 con datos que no vio al calibrarse, como cuando se aplica a 2002–2011.
 
-Métricas (meses nacionales con MODIS ≥ 10 celdas-día):
+Métricas (meses nacionales con MODIS y VIIRS ≥ 10 celdas-día):
   error_medio_pct       promedio de |pred − real| / real
   error_ponderado_pct   Σ|pred − real| / Σ real (pesa más los meses con mucho fuego)
   sesgo_pct             (Σ pred − Σ real) / Σ real (positivo = sobrestima)
@@ -44,7 +44,7 @@ def main():
         val = validar_dejando_un_anio(tot, f_am)
         val["cociente_anual"] = cociente_anual(tot)
         guardar_json(val, ruta(a.trabajo, pais, "validacion.json"))
-        if "error_medio_pct" in val:
+        if val["error_medio_pct"] is not None:
             print(f"{pais:<34} {val['error_medio_pct']:>8} {val['error_ponderado_pct']:>9} {val['sesgo_pct']:>8} "
                   f"{val['r'] if val['r'] is not None else '—':>6} {val['meses_validados']:>6} "
                   f"│ {val['error_medio_pct_factor_unico']:>21}")
