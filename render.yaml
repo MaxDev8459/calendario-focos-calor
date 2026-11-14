@@ -1,0 +1,23 @@
+# Despliegue en Render (plan gratuito): https://render.com/docs/blueprint-spec
+# En Render: New > Blueprint > este repo. La FIRMS_MAP_KEY se escribe en el panel (no va en git).
+services:
+  - type: web
+    name: calendario-focos-calor-api
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /docs
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: FIRMS_MAP_KEY
+        sync: false
+
+  - type: web
+    name: calendario-focos-calor-web
+    runtime: static
+    branch: main
+    buildCommand: echo "sitio estatico, sin compilacion"
+    staticPublishPath: frontend
