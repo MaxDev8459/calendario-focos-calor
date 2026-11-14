@@ -1,0 +1,1733 @@
+{
+ "bbox": [
+  -118.5,
+  14.5,
+  -86.5,
+  32.8
+ ],
+ "desde": "2002-07",
+ "hasta": "2025-12",
+ "unidad": "focos_armonizados",
+ "celdas": [
+  {
+   "anio": 2002,
+   "mes": 7,
+   "conteo": 2612.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2002,
+   "mes": 8,
+   "conteo": 2096.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2002,
+   "mes": 9,
+   "conteo": 1274.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2002,
+   "mes": 10,
+   "conteo": 1283.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2002,
+   "mes": 11,
+   "conteo": 2551.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2002,
+   "mes": 12,
+   "conteo": 4374.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 1,
+   "conteo": 3336.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 2,
+   "conteo": 5807.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 3,
+   "conteo": 23341.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 4,
+   "conteo": 43806.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 5,
+   "conteo": 99604.5,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 6,
+   "conteo": 16668.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 7,
+   "conteo": 4835.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 8,
+   "conteo": 1721.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 9,
+   "conteo": 812.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 10,
+   "conteo": 1140.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 11,
+   "conteo": 2784.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2003,
+   "mes": 12,
+   "conteo": 6362.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 1,
+   "conteo": 3186.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 2,
+   "conteo": 6982.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 3,
+   "conteo": 7655.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 4,
+   "conteo": 26375.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 5,
+   "conteo": 42106.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 6,
+   "conteo": 8375.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 7,
+   "conteo": 3852.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 8,
+   "conteo": 2893.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 9,
+   "conteo": 1414.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 10,
+   "conteo": 1402.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 11,
+   "conteo": 5803.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2004,
+   "mes": 12,
+   "conteo": 6188.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 1,
+   "conteo": 7655.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 2,
+   "conteo": 6889.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 3,
+   "conteo": 26728.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 4,
+   "conteo": 52268.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 5,
+   "conteo": 78509.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 6,
+   "conteo": 31354.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 7,
+   "conteo": 4762.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 8,
+   "conteo": 1510.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 9,
+   "conteo": 1280.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 10,
+   "conteo": 1073.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 11,
+   "conteo": 4716.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2005,
+   "mes": 12,
+   "conteo": 4575.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 1,
+   "conteo": 5770.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 2,
+   "conteo": 7096.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 3,
+   "conteo": 11665.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 4,
+   "conteo": 38249.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 5,
+   "conteo": 62923.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 6,
+   "conteo": 10891.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 7,
+   "conteo": 2271.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 8,
+   "conteo": 1364.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 9,
+   "conteo": 1694.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 10,
+   "conteo": 1249.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 11,
+   "conteo": 2702.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2006,
+   "mes": 12,
+   "conteo": 3607.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 1,
+   "conteo": 2447.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 2,
+   "conteo": 5413.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 3,
+   "conteo": 8198.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 4,
+   "conteo": 26760.5,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 5,
+   "conteo": 67261.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 6,
+   "conteo": 19607.5,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 7,
+   "conteo": 7909.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 8,
+   "conteo": 2428.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 9,
+   "conteo": 914.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 10,
+   "conteo": 1873.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 11,
+   "conteo": 2791.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2007,
+   "mes": 12,
+   "conteo": 5758.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 1,
+   "conteo": 7039.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 2,
+   "conteo": 7217.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 3,
+   "conteo": 13521.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 4,
+   "conteo": 35693.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 5,
+   "conteo": 72551.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 6,
+   "conteo": 12863.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 7,
+   "conteo": 2866.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 8,
+   "conteo": 2224.5,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 9,
+   "conteo": 861.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 10,
+   "conteo": 1776.5,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 11,
+   "conteo": 4001.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2008,
+   "mes": 12,
+   "conteo": 6285.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 1,
+   "conteo": 6509.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 2,
+   "conteo": 9664.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 3,
+   "conteo": 15529.5,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 4,
+   "conteo": 48185.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 5,
+   "conteo": 65611.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 6,
+   "conteo": 16898.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 7,
+   "conteo": 5686.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 8,
+   "conteo": 4769.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 9,
+   "conteo": 2709.6,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 10,
+   "conteo": 1226.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 11,
+   "conteo": 2386.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2009,
+   "mes": 12,
+   "conteo": 3198.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 1,
+   "conteo": 3346.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 2,
+   "conteo": 2904.5,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 3,
+   "conteo": 8615.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 4,
+   "conteo": 20683.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 5,
+   "conteo": 56311.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 6,
+   "conteo": 20847.5,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 7,
+   "conteo": 2646.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 8,
+   "conteo": 1555.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 9,
+   "conteo": 947.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 10,
+   "conteo": 1947.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 11,
+   "conteo": 6268.1,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2010,
+   "mes": 12,
+   "conteo": 8904.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 1,
+   "conteo": 6725.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 2,
+   "conteo": 8868.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 3,
+   "conteo": 18536.7,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 4,
+   "conteo": 60570.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 5,
+   "conteo": 97290.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 6,
+   "conteo": 39666.2,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 7,
+   "conteo": 3456.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 8,
+   "conteo": 2848.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 9,
+   "conteo": 1758.0,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 10,
+   "conteo": 2173.8,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 11,
+   "conteo": 3327.3,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2011,
+   "mes": 12,
+   "conteo": 4174.4,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2012,
+   "mes": 1,
+   "conteo": 4179.9,
+   "fuente": "MODIS_ajustado"
+  },
+  {
+   "anio": 2012,
+   "mes": 2,
+   "conteo": 2703.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 3,
+   "conteo": 10005.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 4,
+   "conteo": 39759.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 5,
+   "conteo": 63891.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 6,
+   "conteo": 19565.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 7,
+   "conteo": 2650.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 8,
+   "conteo": 1972.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 9,
+   "conteo": 1443.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 10,
+   "conteo": 2162.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 11,
+   "conteo": 3042.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2012,
+   "mes": 12,
+   "conteo": 5194.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 1,
+   "conteo": 4088.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 2,
+   "conteo": 8730.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 3,
+   "conteo": 20523.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 4,
+   "conteo": 46607.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 5,
+   "conteo": 71569.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 6,
+   "conteo": 21151.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 7,
+   "conteo": 2917.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 8,
+   "conteo": 1893.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 9,
+   "conteo": 633.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 10,
+   "conteo": 1348.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 11,
+   "conteo": 1406.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2013,
+   "mes": 12,
+   "conteo": 2800.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 1,
+   "conteo": 4725.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 2,
+   "conteo": 5065.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 3,
+   "conteo": 8432.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 4,
+   "conteo": 25265.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 5,
+   "conteo": 29171.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 6,
+   "conteo": 9648.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 7,
+   "conteo": 3075.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 8,
+   "conteo": 2785.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 9,
+   "conteo": 777.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 10,
+   "conteo": 1695.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 11,
+   "conteo": 2395.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2014,
+   "mes": 12,
+   "conteo": 4387.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 1,
+   "conteo": 4707.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 2,
+   "conteo": 6282.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 3,
+   "conteo": 8143.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 4,
+   "conteo": 35829.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 5,
+   "conteo": 45690.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 6,
+   "conteo": 9203.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 7,
+   "conteo": 4086.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 8,
+   "conteo": 4279.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 9,
+   "conteo": 1623.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 10,
+   "conteo": 1845.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 11,
+   "conteo": 1993.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2015,
+   "mes": 12,
+   "conteo": 3624.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 1,
+   "conteo": 6691.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 2,
+   "conteo": 10351.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 3,
+   "conteo": 10056.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 4,
+   "conteo": 32540.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 5,
+   "conteo": 57521.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 6,
+   "conteo": 19999.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 7,
+   "conteo": 4306.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 8,
+   "conteo": 2061.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 9,
+   "conteo": 1427.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 10,
+   "conteo": 2135.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 11,
+   "conteo": 3100.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2016,
+   "mes": 12,
+   "conteo": 4623.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 1,
+   "conteo": 9538.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 2,
+   "conteo": 11974.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 3,
+   "conteo": 22780.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 4,
+   "conteo": 45876.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 5,
+   "conteo": 56605.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 6,
+   "conteo": 26569.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 7,
+   "conteo": 3355.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 8,
+   "conteo": 2107.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 9,
+   "conteo": 1190.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 10,
+   "conteo": 1568.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 11,
+   "conteo": 3930.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2017,
+   "mes": 12,
+   "conteo": 5203.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 1,
+   "conteo": 6402.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 2,
+   "conteo": 6235.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 3,
+   "conteo": 16257.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 4,
+   "conteo": 33508.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 5,
+   "conteo": 50964.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 6,
+   "conteo": 14325.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 7,
+   "conteo": 5697.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 8,
+   "conteo": 2720.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 9,
+   "conteo": 1575.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 10,
+   "conteo": 1249.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 11,
+   "conteo": 2222.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2018,
+   "mes": 12,
+   "conteo": 4602.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 1,
+   "conteo": 6218.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 2,
+   "conteo": 8152.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 3,
+   "conteo": 16345.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 4,
+   "conteo": 46818.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 5,
+   "conteo": 71676.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 6,
+   "conteo": 22080.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 7,
+   "conteo": 5648.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 8,
+   "conteo": 5212.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 9,
+   "conteo": 2469.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 10,
+   "conteo": 1849.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 11,
+   "conteo": 1597.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2019,
+   "mes": 12,
+   "conteo": 3292.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 1,
+   "conteo": 4339.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 2,
+   "conteo": 5404.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 3,
+   "conteo": 13741.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 4,
+   "conteo": 37830.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 5,
+   "conteo": 51123.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 6,
+   "conteo": 15018.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 7,
+   "conteo": 4106.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 8,
+   "conteo": 2339.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 9,
+   "conteo": 1626.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 10,
+   "conteo": 2540.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 11,
+   "conteo": 3489.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2020,
+   "mes": 12,
+   "conteo": 5116.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 1,
+   "conteo": 5067.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 2,
+   "conteo": 8130.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 3,
+   "conteo": 17147.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 4,
+   "conteo": 36700.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 5,
+   "conteo": 41302.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 6,
+   "conteo": 14497.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 7,
+   "conteo": 2849.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 8,
+   "conteo": 1950.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 9,
+   "conteo": 1541.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 10,
+   "conteo": 2024.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 11,
+   "conteo": 2823.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2021,
+   "mes": 12,
+   "conteo": 5359.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 1,
+   "conteo": 5566.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 2,
+   "conteo": 7192.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 3,
+   "conteo": 15448.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 4,
+   "conteo": 27665.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 5,
+   "conteo": 51370.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 6,
+   "conteo": 13141.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 7,
+   "conteo": 3308.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 8,
+   "conteo": 1270.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 9,
+   "conteo": 836.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 10,
+   "conteo": 1688.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 11,
+   "conteo": 2346.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2022,
+   "mes": 12,
+   "conteo": 4481.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 1,
+   "conteo": 6883.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 2,
+   "conteo": 7320.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 3,
+   "conteo": 14824.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 4,
+   "conteo": 33888.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 5,
+   "conteo": 47394.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 6,
+   "conteo": 29867.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 7,
+   "conteo": 5149.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 8,
+   "conteo": 2825.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 9,
+   "conteo": 2666.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 10,
+   "conteo": 1612.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 11,
+   "conteo": 1590.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2023,
+   "mes": 12,
+   "conteo": 2312.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 1,
+   "conteo": 3999.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 2,
+   "conteo": 6307.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 3,
+   "conteo": 15513.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 4,
+   "conteo": 35216.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 5,
+   "conteo": 57596.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 6,
+   "conteo": 17535.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 7,
+   "conteo": 2079.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 8,
+   "conteo": 1714.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 9,
+   "conteo": 1163.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 10,
+   "conteo": 1644.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 11,
+   "conteo": 2923.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2024,
+   "mes": 12,
+   "conteo": 4544.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 1,
+   "conteo": 4731.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 2,
+   "conteo": 6216.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 3,
+   "conteo": 15334.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 4,
+   "conteo": 28790.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 5,
+   "conteo": 42887.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 6,
+   "conteo": 10081.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 7,
+   "conteo": 3149.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 8,
+   "conteo": 2282.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 9,
+   "conteo": 1179.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 10,
+   "conteo": 1686.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 11,
+   "conteo": 3119.0,
+   "fuente": "VIIRS"
+  },
+  {
+   "anio": 2025,
+   "mes": 12,
+   "conteo": 4062.0,
+   "fuente": "VIIRS"
+  }
+ ],
+ "mediana_mensual": [
+  5067.0,
+  6982.1,
+  15334.0,
+  35829.0,
+  57521.0,
+  16898.7,
+  3405.9,
+  2165.8,
+  1347.2,
+  1687.0,
+  2807.0,
+  4559.9
+ ],
+ "mes_pico": 5,
+ "escala": {
+  "min": 0,
+  "max": 99604.5,
+  "cortes": [
+   1626.0,
+   2428.6,
+   3327.3,
+   5067.0,
+   7192.0,
+   15334.0,
+   35693.9
+  ]
+ }
+}
