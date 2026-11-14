@@ -1,0 +1,16 @@
+{
+  "generado": "2026-11-14T21:48:42Z",
+  "version_contrato": "0.2",
+  "paises": [
+    "Mexico"
+  ],
+  "bbox_cubierto": [
+    -118.33,
+    14.55,
+    -86.72,
+    32.71
+  ],
+  "primer_mes": "2002-07",
+  "ultimo_mes_completo": "2025-12",
+  "es_ejemplo": false
+}

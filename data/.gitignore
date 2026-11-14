@@ -1,0 +1,3 @@
+# Archivos intermedios del pipeline (se regeneran)
+intermedio/
+.venv/
