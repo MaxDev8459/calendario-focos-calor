@@ -1,0 +1,40 @@
+{
+  "version": "0.2",
+  "metodo": "factor_por_pais_y_mes_mediana",
+  "pareja_sensores": [
+    "Aqua",
+    "SNPP"
+  ],
+  "unidad": "celdas_dia_con_fuego_1km",
+  "malla_conteo_grados": 0.01,
+  "malla_consulta_grados": 0.1,
+  "periodo_calibracion": [
+    "2012-02",
+    "2025-12"
+  ],
+  "paises": {
+    "Mexico": {
+      "factores": {
+        "1": 4.525,
+        "2": 4.829,
+        "3": 4.541,
+        "4": 4.14,
+        "5": 5.118,
+        "6": 6.193,
+        "7": 6.692,
+        "8": 6.359,
+        "9": 5.373,
+        "10": 5.671,
+        "11": 5.867,
+        "12": 4.822
+      },
+      "validacion": {
+        "tipo": "dejar_un_anio_fuera",
+        "error_medio_pct": 11.3,
+        "sesgo_pct": 2.2,
+        "r": 0.988,
+        "meses_validados": 167
+      }
+    }
+  }
+}
