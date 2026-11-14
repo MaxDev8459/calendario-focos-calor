@@ -65,4 +65,11 @@ Notes:
 2. In the API service, set the environment variable `FIRMS_MAP_KEY`.
 3. Every push to `main` redeploys.
 
-The free plan sleeps after 15 minutes of inactivity (the first request takes about a minute) and its disk is not persistent: recent hotspots are downloaded again on each start, in the background.
+The build runs `backend/despliegue/descargar_datos.py`: the Americas detections file (A1, ~700 MB) is not stored in git, so it is downloaded from the `datos-v1` release (`detecciones_url` in `data/salida/metadata.json`) and checked against `detecciones_filas`. It is downloaded once per deploy, not on every start; if the download fails, the build fails and the previous version stays online.
+
+Free plan limits (Render, November 2026): 512 MB RAM, 0.1 CPU, non-persistent disk, 5 GB outbound bandwidth per month, and the service sleeps after 15 minutes of inactivity (the first request takes about a minute). Recent hotspots are downloaded again on each start, in the background.
+
+With 512 MB of RAM, DuckDB must be limited explicitly so the container is not killed:
+```python
+con = duckdb.connect(config={"memory_limit": "300MB", "threads": 2})
+```

@@ -6,7 +6,8 @@ services:
     runtime: python
     plan: free
     branch: main
-    buildCommand: pip install -r backend/requirements.txt
+    # A1 de América (~700 MB) no va en git: se baja del release en el build (contrato v0.3)
+    buildCommand: pip install -r backend/requirements.txt && python backend/despliegue/descargar_datos.py
     startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /docs
     envVars:
