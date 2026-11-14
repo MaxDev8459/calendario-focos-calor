@@ -288,16 +288,50 @@ def test_actualizar_de_punta_a_punta(tmp_path):
     o, s, e, n = map(float, falso.peticiones[-1].split("/")[6].split(","))   # bbox de los cuadros de México
     assert -119 < o < -117 and 14 < s < 15 and -87 < e < -86 and 32 < n < 33
     a = archivos_nrt(tmp_path / "nrt")
-    assert duckdb.sql(f"SELECT count(*) FROM '{a['detecciones'].as_posix()}' WHERE lat > 27 OR lon > -94").fetchall()[0][0] == 0
-    c = dict(duckdb.sql(f"SELECT mes, fuente FROM '{a['conteos'].as_posix()}'").fetchall())
+    assert duckdb.sql(f"SELECT count(*) FROM '{a['detecciones']}' WHERE lat > 27 OR lon > -94").fetchall()[0][0] == 0
+    c = dict(duckdb.sql(f"SELECT mes, fuente FROM '{a['conteos']}'").fetchall())
     assert c == {8: "VIIRS", 9: "VIIRS_NRT"}
-    total = duckdb.sql(f"SELECT sum(conteo_armonizado) FROM '{a['conteos'].as_posix()}'").fetchall()[0][0]
+    total = duckdb.sql(f"SELECT sum(conteo_armonizado) FROM '{a['conteos']}'").fetchall()[0][0]
     assert total == 11                                       # 2 focos por día en la misma celda = 1 celda-día
     assert json.loads((tmp_path / "nrt" / "metadata_nrt.json").read_text(encoding="utf-8"))["hasta"] == "2026-09-05"
 
 
 def test_archivos_nrt_si_no_hay_nada(tmp_path):
-    assert archivos_nrt(tmp_path) is None
+    assert archivos_nrt(tmp_path, url_base="") is None
+
+
+def release_falso(estado=200):
+    peticiones = []
+
+    def responder(request):
+        peticiones.append(str(request.url))
+        if estado == 200 and request.url.path.endswith("/metadata_nrt.json"):
+            return httpx.Response(200, json={"hasta": "2026-11-02", "dias_por_mes": {"2026-11": [2, 30]}})
+        return httpx.Response(estado)
+    return httpx.Client(transport=httpx.MockTransport(responder)), peticiones
+
+
+def test_archivos_nrt_desde_el_release(tmp_path):
+    """En el despliegue no hay archivos locales: se leen del release nrt-latest (DuckDB httpfs)."""
+    base = "https://github.test/equipo/repo/releases/download/nrt-latest"
+    http, peticiones = release_falso()
+    a = archivos_nrt(tmp_path, url_base=base, http=http)
+    assert a["conteos"] == f"{base}/conteos_celda_mes_nrt.parquet"
+    assert a["detecciones"] == f"{base}/detecciones_nrt.parquet"
+    assert a["metadata"]["hasta"] == "2026-11-02"
+    assert archivos_nrt(tmp_path, url_base=base, http=http) == a
+    assert len(peticiones) == 1                                # la segunda vez sale de la caché
+
+
+def test_archivos_nrt_si_el_release_no_existe(tmp_path):
+    http, _ = release_falso(estado=404)
+    assert archivos_nrt(tmp_path, url_base="https://github.test/otro/releases/download/nrt-latest", http=http) is None
+
+
+def test_archivos_locales_tienen_prioridad(tmp_path):
+    (tmp_path / "metadata_nrt.json").write_text('{"hasta": "2026-11-02"}', encoding="utf-8")
+    a = archivos_nrt(tmp_path, url_base="https://no.se.usa")
+    assert a["conteos"].endswith("/conteos_celda_mes_nrt.parquet") and a["metadata"]["hasta"] == "2026-11-02"
 
 
 def test_periodo_por_defecto_empieza_despues_del_historico():

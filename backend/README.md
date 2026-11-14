@@ -34,24 +34,16 @@ How it matches the archive:
 - **Same footprint.** The FIRMS API only queries by bounding box (the country endpoint no longer exists), and a country's box includes its neighbours and offshore platforms. Only the 0.1° tiles that the archive assigns to the country are kept.
 - **Static sources.** NRT files have no `type` column. Hotspots in the 1 km cells that FIRMS SP flagged as volcano, static land source or offshore (`type` 1–3) are removed from NRT days. Out-of-sample check for Mexico (mask from Jan–Apr 2026, tested on May–Jul 2026 against `type = 0`): error between −0.4 % and −1.7 %. Without it, Aug–Oct 2026 came out 2–3× above the historical median (gas flares dominate in the rainy season).
 
-Because the schemas match, DuckDB can read the archive and the recent data together:
+Because the schemas match, DuckDB can read the archive and the recent data together. `archivos_nrt()` returns local paths in development (`backend/datos_nrt/`) and, in production, the URLs of the `nrt-latest` release, which DuckDB reads in parts over HTTP (httpfs):
 ```python
 from app.firms import archivos_nrt
-nrt = archivos_nrt()   # None if it has not run yet
-files = [str(data_dir / "conteos_celda_mes.parquet")] + ([str(nrt["conteos"])] if nrt else [])
-duckdb.sql(f"SELECT anio, mes, sum(conteo_armonizado) FROM read_parquet({files}) WHERE ... GROUP BY 1, 2")
+nrt = archivos_nrt()   # None if there is no recent data: serve only the archive
+files = [str(data_dir / "conteos_celda_mes.parquet")] + ([nrt["conteos"]] if nrt else [])
+con.execute(f"SELECT anio, mes, sum(conteo_armonizado) FROM read_parquet({files}) WHERE ... GROUP BY 1, 2")
 ```
 
-To refresh automatically while the API is running (every 3 h, in a background thread; without `FIRMS_MAP_KEY` it does nothing and the API serves only the archive):
-```python
-from contextlib import asynccontextmanager
-from app.firms import iniciar_actualizacion_periodica
-
-@asynccontextmanager
-async def lifespan(app):
-    iniciar_actualizacion_periodica()
-    yield
-```
+### Daily refresh (GitHub Actions)
+Serverless functions cannot run background jobs, so `.github/workflows/nrt.yml` runs `python -m app.firms` once a day (07:30 UTC, or by hand from the Actions tab) and publishes `detecciones_nrt.parquet`, `conteos_celda_mes_nrt.parquet` and `metadata_nrt.json` to the `nrt-latest` release. It needs the repository secret `FIRMS_MAP_KEY` (Settings → Secrets and variables → Actions). Scheduled workflows only run from the default branch (`main`).
 
 Notes:
 - Requests are split into 5-day chunks (API limit) and cached on disk; old chunks are never downloaded again. A full run for Mexico (Jan–Nov 2026, about 70 requests) takes under a minute.
@@ -59,17 +51,24 @@ Notes:
 - The current month is incomplete: compare it with the median using `dias_por_mes`.
 - The key is part of every FIRMS URL, so `httpx` request logging is silenced and the key is masked in error messages.
 
-## Deployment (Render, free plan)
-`render.yaml` (repository root) defines the API and the static web app.
-1. Render → **New → Blueprint** → select this repository.
-2. In the API service, set the environment variable `FIRMS_MAP_KEY`.
-3. Every push to `main` redeploys.
+## Deployment (Vercel, Hobby plan)
+FastAPI runs as a single serverless function; Vercel detects `app/main.py` (variable `app`) with no extra configuration.
+1. Create the project with **Root Directory** = `backend/` (the static web app goes in a second project with Root Directory = `frontend/`).
+2. Set `FIRMS_MAP_KEY` in Settings → Environment Variables (it is only needed if the API calls FIRMS directly; the daily refresh uses the GitHub secret).
+3. Every push to `main` redeploys. For a test from the terminal: `cd backend && vercel deploy`.
 
-The build runs `backend/despliegue/descargar_datos.py`: the Americas detections file (A1, ~700 MB) is not stored in git, so it is downloaded from the `datos-v1` release (`detecciones_url` in `data/salida/metadata.json`) and checked against `detecciones_filas`. It is downloaded once per deploy, not on every start; if the download fails, the build fails and the previous version stays online.
+Large files are not bundled (the function must stay under 500 MB; `.vercelignore` excludes `.venv`, `tests` and local data). DuckDB reads them in parts from GitHub releases:
 
-Free plan limits (Render, November 2026): 512 MB RAM, 0.1 CPU, non-persistent disk, 5 GB outbound bandwidth per month, and the service sleeps after 15 minutes of inactivity (the first request takes about a minute). Recent hotspots are downloaded again on each start, in the background.
+| Data | Where it is read from |
+|---|---|
+| A1 detections (~700 MB, 61 M rows) | `datos-v1` release (`detecciones_url` in `data/salida/metadata.json`) |
+| Recent hotspots | `nrt-latest` release (`archivos_nrt()`) |
 
-With 512 MB of RAM, DuckDB must be limited explicitly so the container is not killed:
+DuckDB needs a writable folder for the httpfs extension (only `/tmp` is writable in the function):
 ```python
-con = duckdb.connect(config={"memory_limit": "300MB", "threads": 2})
+con = duckdb.connect()
+con.execute("SET home_directory='/tmp'; SET extension_directory='/tmp/duckdb_ext'")
+con.execute("INSTALL httpfs; LOAD httpfs; SET enable_http_metadata_cache=true")
 ```
+
+Measured from a laptop against the `datos-v1` release (1 thread, cold): loading httpfs 1.5 s, file metadata 1.8 s, Morelos 2024–2025 (6,093 hotspots) 1.7 s, all of Mexico in April 2024 (92,925 hotspots) 2.2 s, 5,000 map points 1.1 s.

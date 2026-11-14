@@ -27,6 +27,11 @@ def map_key() -> str:
     return os.environ.get("FIRMS_MAP_KEY", "").strip()
 
 
+def nrt_url() -> str:
+    """Release donde la GitHub Action publica los Parquet NRT. Vacío = no buscarlos en internet."""
+    return os.environ.get("NRT_URL", "https://github.com/MaxDev8459/calendario-focos-calor/releases/download/nrt-latest")
+
+
 def dir_nrt() -> Path:
     """Carpeta donde se escriben los focos recientes (ignorada por git)."""
     return Path(os.environ.get("NRT_DIR", RAIZ_BACKEND / "datos_nrt"))
