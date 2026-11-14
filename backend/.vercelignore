@@ -1,0 +1,8 @@
+# Lo que no se sube a Vercel (el paquete de la función debe pesar menos de 500 MB)
+.venv
+datos_nrt
+tests
+.pytest_cache
+__pycache__
+.env
+*.env.local
