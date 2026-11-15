@@ -159,7 +159,7 @@ def test_csv_rango_muy_grande(api):
 
 def test_csv_sin_datos(api):
     r = api.get("/api/focos.csv", params={"bbox": "-99.2,18.8,-99.19,18.81", "desde": "2024-09-01", "hasta": "2024-09-01"})
-    assert r.status_code == 404 and r.json() == {"error": "sin_datos", "mensaje": "No hay datos para esa área y ese periodo."}
+    assert r.status_code == 404 and r.json() == {"error": "sin_datos", "mensaje": "No data for that area and period."}
 
 
 def test_geojson_limitado_a_5000(api):
@@ -274,3 +274,148 @@ def test_cors_para_la_web(api):
 def test_ruta_inexistente_con_el_formato_de_errores(api):
     r = api.get("/api/no_existe")
     assert r.status_code == 404 and r.json()["error"] == "no_encontrado" and r.json()["mensaje"]
+
+
+# ---------- QA del contrato: casos límite ----------
+@pytest.mark.parametrize("bbox", [
+    "nan,18.3,-98.6,19.2", "-inf,18.3,inf,19.2", "-200,18.3,-98.6,19.2", "-99.5,18.3,-98.6,95",
+    "-99.5,18.3,-98.6,19.2,1", "-99.5;18.3;-98.6;19.2", "-99.5,18.3,-98.6,19.2,", "-99.5,18.3,-99.5,18.3", "",
+])
+def test_bbox_invalido_en_todas_las_rutas_con_bbox(api, bbox):
+    for ruta, extra in [("/api/calendario", {}), ("/api/anomalia", {"anio": 2024, "mes": 4}), ("/api/celdas", {}),
+                        ("/api/focos", {"desde": "2024-04-01", "hasta": "2024-04-30"}),
+                        ("/api/focos.csv", {"desde": "2024-04-01", "hasta": "2024-04-30"})]:
+        r = api.get(ruta, params={"bbox": bbox, **extra})
+        assert (r.status_code, r.json()["error"]) == (400, "bbox_invalido"), ruta
+    if bbox:                                                    # en la serie el bbox es opcional: vacío = todo
+        assert api.get("/api/serie_armonizacion", params={"bbox": bbox}).json()["error"] == "bbox_invalido"
+
+
+def test_bbox_con_espacios_y_notacion_cientifica(api):
+    a = api.get("/api/calendario", params={"bbox": " -99.5, 18.3, -98.6, 19.2 "})
+    b = api.get("/api/calendario", params={"bbox": "-9.95e1,18.3,-98.6,19.2"})
+    assert a.status_code == b.status_code == 200 and a.json() == b.json() == referencia("calendario_morelos.json")
+
+
+def test_periodo_valido_fuera_de_los_datos_es_sin_datos(api):
+    """Un periodo bien escrito pero sin datos no es `fecha_invalida`."""
+    for desde, hasta in [("1990-01", "1999-12"), ("2030-01", "2030-12")]:
+        r = api.get("/api/calendario", params={"bbox": MORELOS, "desde": desde, "hasta": hasta})
+        assert (r.status_code, r.json()["error"]) == (404, "sin_datos"), (desde, hasta)
+    d = api.get("/api/calendario", params={"bbox": MORELOS, "desde": "1990-01", "hasta": "2002-12"}).json()
+    assert (d["desde"], d["hasta"]) == ("2002-07", "2002-12")       # se recorta a lo que hay
+
+
+@pytest.mark.parametrize("params", [
+    {}, {"desde": "2024-04-01"}, {"desde": "2024-02-30", "hasta": "2024-03-01"}, {"desde": "2024-4-1", "hasta": "2024-04-30"},
+    {"desde": "01/04/2024", "hasta": "30/04/2024"},
+])
+def test_focos_fechas_invalidas(api, params):
+    for ruta in ("/api/focos", "/api/focos.csv"):
+        r = api.get(ruta, params={"bbox": MORELOS, **params})
+        assert (r.status_code, r.json()["error"]) == (400, "fecha_invalida"), ruta
+
+
+@pytest.mark.parametrize("desde, hasta", [("2024-09-01", "2024-09-01"), ("1995-01-01", "1995-12-31"), ("2030-01-01", "2030-01-31")])
+def test_sin_focos_mapa_vacio_y_csv_sin_datos(api, desde, hasta):
+    p = {"bbox": "-99.2,18.8,-99.19,18.81", "desde": desde, "hasta": hasta}
+    g = api.get("/api/focos", params=p)
+    assert g.status_code == 200 and g.json() == {"type": "FeatureCollection", "total": 0, "truncado": False, "features": []}
+    c = api.get("/api/focos.csv", params=p)
+    assert (c.status_code, c.json()["error"]) == (404, "sin_datos")
+
+
+def _mas_recientes(bbox, desde, hasta, n=5000):
+    """Los n focos más recientes del área según los datos de ejemplo (orden de la API)."""
+    import duckdb
+    o, s, e, nn = (float(x) for x in bbox.split(","))
+    return duckdb.sql(
+        f"SELECT fecha, hora_utc, lat, lon FROM '{(EJEMPLO / 'detecciones.parquet').as_posix()}' "
+        f"WHERE fecha BETWEEN DATE '{desde}' AND DATE '{hasta}' AND lat BETWEEN {s} AND {nn} AND lon BETWEEN {o} AND {e} "
+        f"ORDER BY fecha DESC, hora_utc DESC, lat, lon LIMIT {n}").fetchall()
+
+
+@pytest.mark.parametrize("bbox, desde, hasta", [
+    ("-101,17.5,-97.5,20.5", "2024-01-01", "2024-12-31"),        # muchos focos: basta la primera ventana
+    (MORELOS, "2002-07-01", "2025-12-31"),                       # todo el histórico: hay que ampliar la ventana
+    (MORELOS, "2002-07-01", "2030-12-31"),                       # `hasta` más allá de los datos
+])
+def test_geojson_truncado_trae_los_mas_recientes(api, bbox, desde, hasta):
+    d = api.get("/api/focos", params={"bbox": bbox, "desde": desde, "hasta": hasta}).json()
+    esperado = _mas_recientes(bbox, desde, hasta)
+    assert d["truncado"] and d["total"] > 5000 and len(d["features"]) == 5000
+    obtenido = [(f["properties"]["fecha"], f["properties"]["hora_utc"], f["geometry"]["coordinates"][1],
+                 f["geometry"]["coordinates"][0]) for f in d["features"]]
+    assert obtenido == [(fe.isoformat(), ho, la, lo) for fe, ho, la, lo in esperado]
+
+
+def test_celdas_en_orden_estable(api):
+    d = api.get("/api/celdas", params={"bbox": MEXICO, "desde": "2024-01", "hasta": "2024-12"}).json()
+    orden = [(-c["conteo"], c["ty"], c["tx"]) for c in d["celdas"]]
+    assert orden == sorted(orden) and len(orden) > 1000
+
+
+def test_globo_en_orden_estable(api):
+    d = api.get("/api/globo", params={"desde": "2024-01", "hasta": "2024-12"}).json()
+    orden = [(-c["conteo"], c["lat"], c["lon"]) for c in d["celdas"]]
+    assert orden == sorted(orden)
+
+
+def test_globo_solo_con_desde_reciente_llega_al_ultimo_mes(api_con_recientes):
+    d = api_con_recientes.get("/api/globo", params={"desde": "2026-10"}).json()
+    assert (d["desde"], d["hasta"]) == ("2026-10", "2026-11") and d["paises"] == [{"iso_a2": "MX", "conteo": 5}]
+    d = api_con_recientes.get("/api/globo", params={"desde": "2020-01"}).json()
+    assert d["hasta"] == "2025-12"                               # dentro del histórico: hasta el último mes completo
+
+
+def test_anomalia_con_mediana_cero_no_divide(api):
+    """En un cuadro casi sin fuego la mediana del mes es 0: la anomalía en % no existe (null)."""
+    bbox = "-113.5,27.5,-113.4,27.6"
+    cal = api.get("/api/calendario", params={"bbox": bbox})
+    if cal.status_code != 200 or 0.0 not in cal.json()["mediana_mensual"]:
+        pytest.skip("el cuadro de prueba ya no tiene un mes con mediana 0")
+    mes = cal.json()["mediana_mensual"].index(0.0) + 1
+    a = api.get("/api/anomalia", params={"bbox": bbox, "anio": 2020, "mes": mes}).json()
+    assert a["mediana"] == 0.0 and a["anomalia_pct"] is None and 1 <= a["lugar"] <= a["de_anios"]
+
+
+@pytest.mark.parametrize("anio, mes", [("2024", "4.0"), ("dos mil", "4"), ("1999", "4"), ("2024", "13"), ("-1", "4"), ("2024", "")])
+def test_anomalia_parametros_invalidos(api, anio, mes):
+    r = api.get("/api/anomalia", params={"bbox": MORELOS, "anio": anio, "mes": mes})
+    assert (r.status_code, r.json()["error"]) == (400, "fecha_invalida")
+
+
+def test_anomalia_de_un_mes_sin_observar_es_sin_datos(api):
+    for anio, mes in [(2002, 1), (2027, 1)]:                     # antes del primer mes y después del último
+        r = api.get("/api/anomalia", params={"bbox": MORELOS, "anio": anio, "mes": mes})
+        assert (r.status_code, r.json()["error"]) == (404, "sin_datos")
+
+
+def test_preflight_de_cors_y_metodos_no_permitidos(api):
+    r = api.options("/api/calendario", headers={"Origin": "https://ejemplo.vercel.app", "Access-Control-Request-Method": "GET"})
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] == "*"
+    r = api.post("/api/calendario")
+    assert r.status_code == 405 and r.json()["error"] == "peticion_invalida" and r.json()["mensaje"]
+    r = api.get("/api/calendario", headers={"Origin": "https://ejemplo.vercel.app"})       # los errores también llevan CORS
+    assert r.status_code == 400 and r.headers["access-control-allow-origin"] == "*"
+
+
+def test_peticiones_en_paralelo_dan_lo_mismo_que_en_serie(api):
+    from concurrent.futures import ThreadPoolExecutor
+    peticiones = [("/api/calendario", {"bbox": MORELOS}), ("/api/anomalia", {"bbox": MORELOS, "anio": 2024, "mes": 4}),
+                  ("/api/serie_armonizacion", {}), ("/api/celdas", {"bbox": MEXICO, "desde": "2024-01", "hasta": "2024-12"}),
+                  ("/api/focos", {"bbox": MORELOS, "desde": "2024-04-01", "hasta": "2024-04-30"}),
+                  ("/api/focos.csv", {"bbox": MORELOS, "desde": "2024-04-01", "hasta": "2024-04-30"}), ("/api/metadata", {})]
+    serie = [api.get(r, params=p) for r, p in peticiones]
+    with ThreadPoolExecutor(8) as ex:
+        paralelo = list(ex.map(lambda x: api.get(x[0], params=x[1]), peticiones * 4))
+    assert all(r.status_code == 200 for r in paralelo)
+    assert [r.content for r in paralelo] == [r.content for r in serie] * 4
+
+
+def test_openapi_documenta_todas_las_rutas(api):
+    rutas = api.get("/openapi.json").json()["paths"]
+    for ruta in ("/api/calendario", "/api/anomalia", "/api/focos", "/api/focos.csv", "/api/serie_armonizacion",
+                 "/api/celdas", "/api/globo", "/api/metadata"):
+        assert rutas[ruta]["get"]["summary"] and rutas[ruta]["get"]["description"], ruta
+    assert api.get("/docs").status_code == 200

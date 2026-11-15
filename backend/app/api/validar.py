@@ -3,11 +3,12 @@ import math
 import re
 from datetime import date
 
+# Los códigos (`error`) son los del contrato; el texto (`mensaje`) lo ve quien usa la API, así que va en inglés.
 MENSAJES = {
-    "bbox_invalido": "El bbox debe ser oeste,sur,este,norte en grados decimales.",
-    "fecha_invalida": "Las fechas van como AAAA-MM-DD y los meses como AAAA-MM, con desde <= hasta.",
-    "sin_datos": "No hay datos para esa área y ese periodo.",
-    "rango_muy_grande": "El rango supera las 50 000 filas. Reduce el área o el periodo.",
+    "bbox_invalido": "bbox must be west,south,east,north in decimal degrees.",
+    "fecha_invalida": "Dates must be YYYY-MM-DD and months YYYY-MM (months 1-12), with desde <= hasta.",
+    "sin_datos": "No data for that area and period.",
+    "rango_muy_grande": "The request exceeds 50,000 rows. Narrow the area or the period.",
 }
 
 
