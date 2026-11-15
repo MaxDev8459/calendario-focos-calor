@@ -6,6 +6,7 @@
                                VIIRS desde feb-2012 (fuente VIIRS)
   A3 factores.json             factores por país y mes, su origen y la validación
   A4 metadata.json
+  A5 celdas_persistentes.parquet  celdas de 0.01° (fy, fx) quitadas por ser fuentes de calor persistentes
 
 Se guarda toda combinación cuadro-mes con fuego en al menos un sensor; las que no aparecen
 valen 0 dentro del periodo.
@@ -60,6 +61,16 @@ def main():
     conteos = pl.concat(partes).sort("pais", "ty", "tx", "anio", "mes")
     conteos.write_parquet(os.path.join(a.salida, "conteos_celda_mes.parquet"), compression="zstd",
                           compression_level=22)
+
+    # A5 · celdas persistentes (refinerías, quemadores de gas) que 01_limpiar quitó: el backend las quita
+    # también de los focos NRT para que una fuente industrial no aparezca como incendio del mes actual
+    (pl.concat([pl.read_parquet(ruta(a.trabajo, p, "persistentes.parquet")).with_columns(pl.lit(p).alias("pais"))
+                for p in paises])
+     .select("pais", "fy", "fx",
+             ((pl.col("fy") + 0.5) * MALLA_FINA).round(3).alias("lat_c"),
+             ((pl.col("fx") + 0.5) * MALLA_FINA).round(3).alias("lon_c"))
+     .sort("pais", "fy", "fx")
+     .write_parquet(os.path.join(a.salida, "celdas_persistentes.parquet")))
 
     # A1 · detecciones (en streaming para no cargar toda América en memoria)
     pl.concat([pl.scan_parquet(ruta(a.trabajo, p, "detecciones.parquet")) for p in paises]) \
