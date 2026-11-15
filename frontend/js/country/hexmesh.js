@@ -185,9 +185,17 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
   let alive = true;
 
   // keep the country clear of the title (top-left), tools (left), cards (right) and legend (bottom)
-  const insets = () => (innerWidth > 960
-    ? { top: 210, left: 230, right: Math.min(460, innerWidth * 0.34) + 70, bottom: 120 }
-    : { top: 190, left: 20, right: 20, bottom: 200 });
+  // The country is framed in the free space between the left column and the right panel,
+  // measured from the page itself so nothing ever lands under a card.
+  const insets = () => {
+    if (innerWidth < 768) return { top: 190, left: 20, right: 20, bottom: 200 };
+    const L = document.querySelector(".cv-left")?.getBoundingClientRect();
+    const C = document.querySelector(".cv-cards")?.getBoundingClientRect();
+    const left = L?.width ? L.right + 24 : 230;
+    const right = C?.width ? innerWidth - C.left + 24 : Math.min(460, innerWidth * 0.34) + 70;
+    const ok = innerWidth - left - right > 240;
+    return { top: 116, bottom: 48, left: ok ? left : 40, right: ok ? right : 40 };
+  };
 
   return {
     map,

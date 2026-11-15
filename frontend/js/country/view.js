@@ -1,6 +1,6 @@
 // Country view (M11, M13–M19, M23): hex mesh + four floating cards with callout lines,
 // plus the detected-vs-reported block. Full state lives in the URL hash (M17 shareable link).
-import { T, REGION_NAMES, LABELS } from "../i18n/en.js";
+import { T, REGION_NAMES, LABELS, MONTHS_SHORT } from "../i18n/en.js";
 import { FIRST_MONTH, LAST_MONTH_FALLBACK, VIIRS_START_YEAR } from "../config.js";
 import { icons } from "../ui/icons.js";
 import { countryByIso } from "../util/geo.js";
@@ -60,6 +60,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
     const c = T.country;
     el.innerHTML = `
       <svg class="cv-callouts" aria-hidden="true"></svg>
+      <div class="cv-left">
       <div class="cv-head">
         <nav class="crumbs mono" aria-label="${c.breadcrumbLabel}">
           <button type="button" data-crumb="planet">${c.planet}</button><span aria-hidden="true">→</span>
@@ -79,8 +80,9 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
         </div>
       </div>
       <div class="cv-legend" data-legend></div>
+      </div>
       <div class="hex-tip" role="tooltip" hidden></div>
-      <aside class="cv-cards" aria-labelledby="cv-title" data-cards>
+      <aside class="cv-cards" aria-labelledby="cv-title" data-cards data-lenis-prevent>
         <button type="button" class="sheet-handle" data-sheet aria-expanded="false"><span aria-hidden="true"></span><span class="sr-only">${T.country.sheet}</span></button>
         <nav class="card-tabs" aria-label="${c.tabs.label}">${["cell", "calendar", "anomaly", "controls", "summary"].map((k) => `<button type="button" data-tab="${k}">${c.tabs[k]}</button>`).join("")}</nav>
         <section class="card" data-card="cell" aria-live="polite"></section>
@@ -89,7 +91,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
         <section class="card" data-card="controls"></section>
         <section class="card" data-card="summary"></section>
       </aside>
-      <dialog class="cal-dialog" data-cal-dialog aria-labelledby="cal-dialog-title">
+      <dialog class="cal-dialog" data-cal-dialog data-lenis-prevent aria-labelledby="cal-dialog-title">
         <div class="cal-dialog-head"><h3 id="cal-dialog-title" class="serif">${c.calendar.expandedTitle} · <em>${s.name}</em></h3><button type="button" class="icon-btn" data-cal-close aria-label="${c.calendar.collapse}">${icons.close}</button></div>
         <p class="scope mono" data-cal-dialog-scope></p>
         <div data-cal-dialog-body></div>
@@ -167,6 +169,21 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
     renderAnomaly(el.querySelector('[data-card="anomaly"]'), anomaly);
   }
 
+  // Month picker built from two selects, so it reads in English in every browser and never overflows.
+  function monthField(name, label, value) {
+    const [y0] = FIRST_MONTH.split("-").map(Number);
+    const [y1] = maxMonth().split("-").map(Number);
+    const [vy, vm] = value.split("-");
+    const years = [];
+    for (let y = y1; y >= y0; y--) years.push(`<option value="${y}"${String(y) === vy ? " selected" : ""}>${y}</option>`);
+    const months = MONTHS_SHORT.map((m, i) => { const v = String(i + 1).padStart(2, "0"); return `<option value="${v}"${v === vm ? " selected" : ""}>${m}</option>`; }).join("");
+    return `<div class="field" role="group" aria-labelledby="${name}-lbl"><span class="label" id="${name}-lbl">${label}</span>
+      <span class="field-box ym-box">${icons.calendar}
+        <select name="${name}-m" data-ym="${name}" aria-label="${label}: ${T.country.controls.month}" aria-describedby="range-err">${months}</select>
+        <select name="${name}-y" data-ym="${name}" aria-label="${label}: ${T.country.controls.year}" aria-describedby="range-err">${years.join("")}</select>
+        <input type="hidden" name="${name}" value="${value}">
+      </span></div>`;
+  }
   function renderControls() {
     const c = T.country.controls;
     const card = el.querySelector('[data-card="controls"]');
@@ -175,15 +192,15 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
       <div class="card-head"><h3 class="label">${c.title}</h3></div>
       <form class="ctl-form" data-range novalidate>
         <div class="field-row">
-          <label class="field"><span class="label">${c.from}</span><span class="field-box">${icons.calendar}<input type="month" name="from" value="${s.from}" min="${FIRST_MONTH}" max="${maxMonth()}" required aria-describedby="range-err"></span></label>
-          <label class="field"><span class="label">${c.to}</span><span class="field-box">${icons.calendar}<input type="month" name="to" value="${s.to}" min="${FIRST_MONTH}" max="${maxMonth()}" required aria-describedby="range-err"></span></label>
+          ${monthField("from", c.from, s.from)}
+          ${monthField("to", c.to, s.to)}
         </div>
         <p class="field-err" id="range-err" role="alert"></p>
         <details class="days">
           <summary>${c.days}</summary>
           <div class="field-row">
-            <label class="field"><span class="label">${c.dayFrom}</span><span class="field-box"><input type="date" name="dfrom" value="${s.dayFrom}"></span></label>
-            <label class="field"><span class="label">${c.dayTo}</span><span class="field-box"><input type="date" name="dto" value="${s.dayTo}"></span></label>
+            <label class="field"><span class="label">${c.dayFrom}</span><span class="field-box">${icons.calendar}<input type="text" name="dfrom" value="${s.dayFrom}" inputmode="numeric" placeholder="YYYY-MM-DD" maxlength="10" autocomplete="off" spellcheck="false" class="num"></span></label>
+            <label class="field"><span class="label">${c.dayTo}</span><span class="field-box">${icons.calendar}<input type="text" name="dto" value="${s.dayTo}" inputmode="numeric" placeholder="YYYY-MM-DD" maxlength="10" autocomplete="off" spellcheck="false" class="num"></span></label>
           </div>
         </details>
       </form>
@@ -224,6 +241,9 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
     const rangeErr = card.querySelector("#range-err");
     range.addEventListener("change", (ev) => {
       const f = range.elements;
+      // month + year selects write the YYYY-MM value into their hidden field
+      const ym = ev.target.dataset.ym;
+      if (ym) f[ym].value = `${f[`${ym}-y`].value}-${f[`${ym}-m`].value}`;
       if (ev.target.name === "dfrom" || ev.target.name === "dto") {
         const v = validateDayRange(f.dfrom.value, f.dto.value);
         rangeErr.textContent = v.error ?? "";
@@ -458,6 +478,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
     renderSummary();
     await loadAnomaly(tk);
     syncHash();
+    el.querySelector("[data-cards]")?.dispatchEvent(new Event("scroll"));
     requestAnimationFrame(drawCallouts);
   }
 

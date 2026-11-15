@@ -166,6 +166,10 @@ export const T = {
     none: "No active country matches. Only the Americas are live for now.",
     top: "Most active",
   },
+  loader: {
+    kicker: "Opening",
+    steps: ["Flying to the country…", "Loading 23 years of hotspots…", "Building the hexagon grid…", "Almost there…"],
+  },
 
   comingSoon: {
     tag: "Coming soon",
@@ -187,7 +191,7 @@ export const T = {
     loading: "Loading hotspots…",
     perHex: "per hexagon",
     perHexPoints: (month) => `Detections per hexagon · ${month}`,
-    hexDetections: (n) => `${n} detection${n === "1" ? "" : "s"} in this hexagon`,
+    hexDetections: (n) => `${n} detection${n === "1" ? "" : "s"} in this area`,
     detailHint: "Zoomed in: individual detections for the selected month",
     hexTooltip: (n) => `${n} hotspots`,
     scopeCountry: (c) => `Scope: ${c}`,
@@ -251,6 +255,8 @@ export const T = {
       from: "From",
       to: "To",
       monthHint: "Month, YYYY-MM",
+      month: "month",
+      year: "year",
       days: "Exact days for points and CSV",
       dayFrom: "From day",
       dayTo: "To day",

@@ -21,7 +21,7 @@ export function countryPicker(host, { compact = false, current = null, totals = 
         placeholder="${compact ? t.switchPlaceholder : innerWidth < 480 ? t.placeholderShort : t.placeholder}" autocomplete="off" spellcheck="false">
       <button type="button" class="cpick-toggle" tabindex="-1" aria-label="${t.showAll}">${icons.chevron}</button>
     </div>
-    <ul class="cpick-list" role="listbox" id="${id}-list" hidden></ul>
+    <ul class="cpick-list" role="listbox" id="${id}-list" data-lenis-prevent hidden></ul>
     ${compact ? "" : `<div class="cpick-chips" data-chips aria-label="${t.top}"></div>`}`;
   const input = host.querySelector("input");
   const ul = host.querySelector("ul");

@@ -397,6 +397,8 @@ export function initGlobe(container, world, { onCountryClick, onCountryHover } =
     stage.classList.toggle("is-interactive", on);
     for (const h of handlers) on ? map[h].enable() : map[h].disable();
     if (on) map.touchZoomRotate.disableRotation();
+    // Explore: the wheel zooms, but the globe never shrinks to a dot (scroll momentum used to do that)
+    whenReady(() => map.setMinZoom(on && !countryMode ? Math.max(0.4, zoomForAlt(layoutFor("explore").alt) - 0.6) : 0.4));
     if (!on) { setHover(null); onCountryHover?.(null); }
   }
   setInteractive(false);
@@ -444,7 +446,9 @@ export function initGlobe(container, world, { onCountryClick, onCountryHover } =
     centerPx,
     pov(lat, lng, alt, ms = 1400) {
       whenReady(() => {
-        const zoom = alt != null ? zoomForAlt(alt, lat) : map.getZoom();
+        // no altitude given: use the layout's own altitude, so leaving a deep country zoom always resets it
+        const zoom = zoomForAlt(alt ?? layoutFor(layout === "country" ? "explore" : layout).alt, lat);
+        if (zoom < map.getMinZoom()) map.setMinZoom(Math.max(0.4, zoom - 0.1));
         map.easeTo({ center: [lng, lat], zoom, duration: reducedMotion ? 0 : ms, essential: true });
       });
     },
@@ -457,6 +461,7 @@ export function initGlobe(container, world, { onCountryClick, onCountryHover } =
     zoomBy(f) { map.easeTo({ zoom: map.getZoom() - Math.log2(f) * 1.6, duration: reducedMotion ? 0 : 450 }); pauseRotation(); },
     setLayout(name, { ms = 1100, keepPov = false } = {}) {
       if (countryMode && name !== "country") exitCountry();
+      if (name !== "explore") whenReady(() => map.setMinZoom(0.4));
       layout = name;
       const L = layoutFor(name);
       stage.dataset.layout = name;
