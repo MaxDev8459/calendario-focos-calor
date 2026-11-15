@@ -2,7 +2,7 @@
 
 **See where the planet burns.** By team **InSync**.
 
-**Live app:** https://focos-calor-web.vercel.app · **API docs:** https://focos-calor-api.vercel.app/docs
+**Live app:** https://focos-calor-web.vercel.app · **API docs:** https://focos-calor-api.vercel.app/docs · **Presentation:** [docs/heat-atlas-presentation.pdf](docs/heat-atlas-presentation.pdf)
 
 A web application that **harmonizes MODIS and VIIRS active fire hotspots** (NASA FIRMS) into a single, consistent time series from 2002 to today, and shows it as a **burning activity calendar** for any area the user selects in the Americas.
 
