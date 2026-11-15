@@ -1,0 +1,66 @@
+# Despliega la API en Vercel cada vez que cambia backend/ en main.
+# La app de GitHub de Vercel no puede leer este repo desde el equipo de Vercel, así que el
+# despliegue se hace con la CLI y un token. El Root Directory del proyecto en Vercel se queda
+# vacío (".") porque se despliega desde la carpeta backend/; no lo cambies a "backend".
+# Secretos necesarios (Settings > Secrets and variables > Actions):
+#   VERCEL_TOKEN       token del equipo "In sync" (vence en 7 días; renovarlo si caduca)
+#   VERCEL_ORG_ID      ID del equipo en Vercel
+#   VERCEL_PROJECT_ID  ID del proyecto focos-calor-api
+name: Deploy API (Vercel)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/vercel-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-api
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          for v in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Missing secret $v"; exit 1; fi
+          done
+
+      - name: Deploy to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes vercel@65.16.0 deploy --prod --yes --token "$VERCEL_TOKEN"
+
+      - name: Smoke test
+        run: |
+          url="https://focos-calor-api.vercel.app/api/calendario?bbox=-99.5,18.3,-98.6,19.2"
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url" || true)
+            echo "attempt $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::The API did not answer 200 after the deploy"; exit 1
