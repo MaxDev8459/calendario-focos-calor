@@ -2,7 +2,7 @@
 // Formula: (current − baseline) / baseline × 100. Signed number always shown next to colour (M12).
 import { DIVERGING } from "../config.js";
 import { T, LABELS } from "../i18n/en.js";
-import { fmtInt, fmtNum, fmtPct, monthName, ordinal } from "../util/format.js";
+import { fmtInt, fmtNum, fmtPct, monthName, ordinal, anomalyPct } from "../util/format.js";
 import { icons } from "../ui/icons.js";
 
 export function divergingColor(pct) {
@@ -25,12 +25,12 @@ export function completeAnomaly(a, calendar) {
     out.conteo = cell?.conteo ?? null;
     out.fuente = cell?.fuente ?? null;
     out.mediana = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-    out.anomalia = out.conteo != null && out.mediana ? ((out.conteo - out.mediana) / out.mediana) * 100 : null;
+    out.anomalia = anomalyPct(out.conteo, out.mediana);
     for (const k of ["promedio", "anomalia_vs_promedio", "total_anios", "lugar", "percentil", "linea_base"]) out[k] = null;
     out.sample = false;
   }
   if (out.promedio == null && vals.length) out.promedio = vals.reduce((s, v) => s + v, 0) / vals.length;
-  if (out.anomalia_vs_promedio == null && out.promedio) out.anomalia_vs_promedio = ((out.conteo - out.promedio) / out.promedio) * 100;
+  if (out.anomalia_vs_promedio == null && out.promedio) out.anomalia_vs_promedio = anomalyPct(out.conteo, out.promedio);
   if (out.total_anios == null) out.total_anios = vals.length;
   if (out.lugar == null && out.conteo != null) out.lugar = vals.filter((v) => v > out.conteo).length + 1;
   if (out.percentil == null && out.conteo != null) out.percentil = Math.round((vals.filter((v) => v <= out.conteo).length / vals.length) * 100);

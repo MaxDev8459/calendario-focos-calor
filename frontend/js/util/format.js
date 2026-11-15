@@ -14,6 +14,12 @@ export function fmtPct(p, digits = 0) {
   const s = new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(Math.abs(v));
   return `${v > 0 ? "+" : v < 0 ? "−" : "±"}${s}%`;
 }
+// Anomaly vs a baseline, rounded to 1 decimal exactly like the API (anomalia_pct), so the calendar
+// readout and the anomaly card show the same whole-number percentage after fmtPct.
+export function anomalyPct(count, baseline) {
+  if (count == null || !baseline) return null;
+  return Math.round(((count - baseline) / baseline) * 1000) / 10;
+}
 export function ordinal(n) {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);

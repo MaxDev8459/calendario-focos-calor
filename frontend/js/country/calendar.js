@@ -1,19 +1,20 @@
 // Burn calendar (M13): years × months, coloured by harmonized count with the contract's 7 cuts (8 colours).
 // role="grid" with roving tabindex and arrow keys. null = grey hatch, 0 = lowest colour (0 ≠ null).
-import { RAMP, VIIRS_START_YEAR } from "../config.js";
+import { VIIRS_START_YEAR } from "../config.js";
+import { ramp } from "../util/ramp.js";
 import { T, MONTHS_INITIAL, MONTHS_SHORT } from "../i18n/en.js";
-import { fmtInt, fmtNum, monthName, fmtPct } from "../util/format.js";
+import { fmtInt, fmtNum, monthName, fmtPct, anomalyPct } from "../util/format.js";
 import { stepLegendHTML } from "../ui/legend.js";
 import { icons } from "../ui/icons.js";
 
 // 8 colours picked from the 10-step ramp, lightness still monotonic (M12)
-export const CAL_COLORS = [RAMP[0], RAMP[1], RAMP[2], RAMP[4], RAMP[5], RAMP[6], RAMP[8], RAMP[9]];
+export const calColors = () => [0, 1, 2, 4, 5, 6, 8, 9].map((i) => ramp()[i]);
 
 export function binColor(v, cuts) {
   if (v == null) return null;
   let i = 0;
   while (i < cuts.length && v >= cuts[i]) i++;
-  return CAL_COLORS[i];
+  return calColors()[i];
 }
 
 /**
@@ -50,7 +51,7 @@ export function renderCalendar(el, data, opts) {
         const isFocus = opts.focus && opts.focus.y === y && opts.focus.m === m;
         const isMax = max && max.anio === y && max.mes === m;
         const cls = ["cal-c", v == null ? "is-null" : "", inRange(y, m) ? "" : "is-out", isMax ? "is-max" : "", isFocus ? "is-focus" : ""].filter(Boolean).join(" ");
-        const label = v == null ? T.country.calendar.readoutNull(monthName(m), y) : T.country.calendar.readout(monthName(m), y, fmtInt(v), med[i] ? fmtPct(((v - med[i]) / med[i]) * 100) : "");
+        const label = v == null ? T.country.calendar.readoutNull(monthName(m), y) : T.country.calendar.readout(monthName(m), y, fmtInt(v), med[i] ? fmtPct(anomalyPct(v, med[i])) : "");
         return `<span role="gridcell" class="${cls}" tabindex="${isFocus ? 0 : -1}" data-y="${y}" data-m="${m}" aria-label="${label}" aria-selected="${isFocus}" ${col ? `style="--c:${col}"` : ""}>${expanded && v != null ? `<span class="v num">${fmtNum(v)}</span>` : ""}</span>`;
       }).join("");
       return `<div class="cal-row${seam}" role="row"><span class="cal-y mono" role="rowheader">${y}</span>${tds}</div>`;
@@ -68,7 +69,7 @@ export function renderCalendar(el, data, opts) {
       </div>
       <p class="cal-readout mono" aria-live="polite" data-readout></p>
       <p class="sr-only" id="cal-summary-${expanded ? "x" : "c"}">${summary}</p>
-      ${stepLegendHTML(cuts, CAL_COLORS)}
+      ${stepLegendHTML(cuts, calColors())}
       <p class="cal-null-key mono"><i class="hatch" aria-hidden="true"></i>${T.country.calendar.noData}</p>
     </div>`;
 

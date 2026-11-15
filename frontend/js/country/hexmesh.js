@@ -2,7 +2,7 @@
 // neighbours so the fire pattern reads as a mesh (like FIRMS points, but aggregated and comparable).
 // The H3 resolution follows the zoom, so hexagons stay a few pixels wide: zoom in and they get finer.
 import { latLngToCell, cellToBoundary, cellToLatLng, cellArea, gridDisk } from "../../vendor/geo.js";
-import { RAMP } from "../config.js";
+import { ramp } from "../util/ramp.js";
 import { T } from "../i18n/en.js";
 import { fmtInt } from "../util/format.js";
 import { reducedMotion, state, on } from "../state.js";
@@ -32,8 +32,8 @@ function quantileCuts(values) {
   for (const q of qs) { let n = nice(v[Math.min(v.length - 1, Math.floor(q * v.length))]); const prev = out[out.length - 1]; if (out.length && n <= prev) n = prev < 10 ? Math.floor(prev) + 1 : Math.max(prev + 1, nice(prev * 1.15)); out.push(n); }
   return out;
 }
-export const colorFor = (v, cuts) => { let i = 0; while (i < cuts.length && v >= cuts[i]) i++; return RAMP[i]; };
-const stepExpr = (cuts) => { const e = ["step", ["get", "v"], RAMP[0]]; cuts.forEach((c, i) => e.push(c, RAMP[i + 1])); return e; };
+export const colorFor = (v, cuts) => { let i = 0; while (i < cuts.length && v >= cuts[i]) i++; return ramp()[i]; };
+const stepExpr = (cuts) => { const R = ramp(); const e = ["step", ["get", "v"], R[0]]; cuts.forEach((c, i) => e.push(c, R[i + 1])); return e; };
 
 function ring(h, k = 1) {
   const [la, lo] = cellToLatLng(h);
@@ -58,7 +58,7 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
     filter: [">=", ["get", "t"], 0.55],
     paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5, 6, 9, 9, 14], "circle-color": stepExpr([1, 2, 3, 4, 5, 6, 7, 8, 9]), "circle-blur": 1, "circle-opacity": 0.45 },
   });
-  add("hx-fill", "hx", { type: "fill", paint: { "fill-color": RAMP[5], "fill-opacity": 0, "fill-opacity-transition": { duration: reducedMotion ? 0 : 900, delay: 0 } } });
+  add("hx-fill", "hx", { type: "fill", paint: { "fill-color": ramp()[5], "fill-opacity": 0, "fill-opacity-transition": { duration: reducedMotion ? 0 : 900, delay: 0 } } });
   add("hx-sel", "hx-sel", { type: "line", paint: { "line-color": I.sel, "line-width": 2.4 } });
   add("area-line", "area", { type: "line", paint: { "line-color": I.area, "line-width": 1.6, "line-dasharray": [3, 2] } });
   add("pts", "pts", { type: "circle", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 2.2, 9, 4.5], "circle-color": I.pt, "circle-stroke-color": I.ptStroke, "circle-stroke-width": 0.8, "circle-opacity": 0.95 } });
@@ -93,8 +93,7 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
     map.getSource("hx").setData({ type: "FeatureCollection", features: fill });
     map.getSource("hx-centers").setData({ type: "FeatureCollection", features: centers });
     map.getSource("hx-links").setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "MultiLineString", coordinates: links } }] });
-    map.setPaintProperty("hx-fill", "fill-color", stepExpr(cuts));
-    map.setPaintProperty("hx-glow", "circle-color", ["step", ["get", "t"], RAMP[0], ...cuts.flatMap((_, i) => [(i + 1) / cuts.length, RAMP[i + 1]])]);
+    paintRamp();
     if (firstPaint && !reducedMotion) {
       map.setPaintProperty("hx-fill", "fill-opacity", 0);
       requestAnimationFrame(() => requestAnimationFrame(() => map.setPaintProperty("hx-fill", "fill-opacity", 0.95)));
@@ -104,6 +103,11 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
     return { cuts, values };
   }
 
+  function paintRamp() {
+    const R = ramp();
+    map.setPaintProperty("hx-fill", "fill-color", stepExpr(cuts));
+    map.setPaintProperty("hx-glow", "circle-color", ["step", ["get", "t"], R[0], ...cuts.flatMap((_, i) => [(i + 1) / cuts.length, R[i + 1]])]);
+  }
   function setCells(list) { cells = list; if (mode === "cells") return build(); refreshPoints(true); return { cuts }; }
 
   // detail mode: fetch the detections for what is on screen (inside the clip box), debounced
@@ -169,6 +173,7 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
     map.getSource("pts").setData(features ? { type: "FeatureCollection", features } : EMPTY);
   }
   const restyle = () => {
+    if (cuts.length) { paintRamp(); onRes?.({ res, cuts, mode }); }
     const I = ink();
     map.setPaintProperty("hx-links", "line-color", I.link);
     map.setPaintProperty("hx-sel", "line-color", I.sel);

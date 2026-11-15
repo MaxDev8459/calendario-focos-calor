@@ -1,7 +1,7 @@
 // Country view (M11, M13–M19, M23): hex mesh + four floating cards with callout lines,
 // plus the detected-vs-reported block. Full state lives in the URL hash (M17 shareable link).
 import { T, REGION_NAMES, LABELS } from "../i18n/en.js";
-import { RAMP, FIRST_MONTH, LAST_MONTH_FALLBACK, VIIRS_START_YEAR } from "../config.js";
+import { FIRST_MONTH, LAST_MONTH_FALLBACK, VIIRS_START_YEAR } from "../config.js";
 import { icons } from "../ui/icons.js";
 import { countryByIso } from "../util/geo.js";
 import { geoContains } from "../../vendor/geo.js";
@@ -15,6 +15,7 @@ import { renderCalendar, calendarHeader } from "./calendar.js";
 import { renderAnomaly, completeAnomaly } from "./anomaly.js";
 import { validateBbox, pointToBbox, validateMonthRange, validateDayRange, startDraw } from "./draw.js";
 import { renderYearBars } from "./chart.js";
+import { ramp } from "../util/ramp.js";
 import { stepLegendHTML } from "../ui/legend.js";
 
 let americasPromise = null;
@@ -299,6 +300,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
     const when = p.hora_utc ? fmtAcq(p.fecha, p.hora_utc) : T.country.points.utcDate(p.fecha);
     return T.country.points.tooltip(when, p.sensor, conf, fmtNum(p.frp_mw), LABELS.dia_noche[p.dia_noche] ?? "");
   };
+  on("theme", () => { if (s && !el.hidden && calData) { renderCalendarCard(); renderSummary(); } });
   on("tz", () => { if (lastPoints && map) map.setPoints(lastPoints, pointTip); if (s && !el.hidden) renderSummary(); });
 
   function syncBboxInputs() {
@@ -354,7 +356,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
         <p class="trend mono">${trendTxt}</p>
         <p class="sr-only">${maxY ? t.yearChartSummary(maxY.year, fmtInt(maxY.value), minY.year, fmtInt(minY.value)) : ""}</p>
       </div>`;
-    renderYearBars(card.querySelector("[data-years]"), years, RAMP);
+    renderYearBars(card.querySelector("[data-years]"), years, ramp());
   }
 
   // ---------- callout lines (§4.4: 400 ms draw from the hexagon to the cards)
@@ -506,7 +508,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
       },
       onRes: ({ cuts, mode }) => {
         const lg = el.querySelector("[data-legend]");
-        if (lg) lg.innerHTML = stepLegendHTML(cuts, RAMP, { label: mode === "points" ? T.country.perHexPoints(fmtMonthKey(detailMonth())) : T.country.perHex });
+        if (lg) lg.innerHTML = stepLegendHTML(cuts, ramp(), { label: mode === "points" ? T.country.perHexPoints(fmtMonthKey(detailMonth())) : T.country.perHex });
       },
       // zoomed in: the individual detections (B4) for the selected month, binned into small hexagons
       loadPoints: async (bbox) => {

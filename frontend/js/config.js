@@ -11,6 +11,8 @@ export const USE_MOCK = params.get("mock") === "1" || !API_URL;
 export const ACTIVE_REGIONS = ["north_america", "central_america", "caribbean", "south_america"];
 // M12 — sequential ramp, monotonic lightness (fewer → more fire).
 export const RAMP = ["#370617", "#6A040F", "#9D0208", "#D00000", "#DC2F02", "#E85D04", "#F48C06", "#FAA307", "#FFBA08", "#FFE8A3"];
+// Day theme: same colours, reversed, so more fire = darker on the light background.
+export const RAMP_DAY = [...RAMP].reverse();
 // M12 — diverging ramp for anomalies (blue = below normal, red = above).
 export const DIVERGING = ["#1D4E89", "#3F7CBF", "#9CC3E4", "#E9E2D6", "#F6B48A", "#E8622C", "#B3001B"];
 export const VIIRS_BLUE = "#7CC6FF"; // reserved: VIIRS / 2012 marker only
