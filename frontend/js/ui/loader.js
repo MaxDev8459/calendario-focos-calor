@@ -27,6 +27,7 @@ export function countryLoader() {
     timers.forEach(clearTimeout);
     timers = [];
     el.classList.remove("is-on");
+    document.body.classList.remove("is-loading-country");
     timers.push(setTimeout(() => { if (!el.classList.contains("is-on")) el.hidden = true; }, reducedMotion ? 0 : 450));
   }
 
@@ -40,6 +41,7 @@ export function countryLoader() {
       stepEl.textContent = T.loader.steps[0];
       T.loader.steps.slice(1).forEach((txt, i) => timers.push(setTimeout(() => { stepEl.textContent = txt; }, 900 * (i + 1))));
       el.hidden = false;
+      document.body.classList.add("is-loading-country");
       shownAt = performance.now();
       requestAnimationFrame(() => el.classList.add("is-on"));
       return () => {

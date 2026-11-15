@@ -861,3 +861,12 @@ body.in-country main, body.in-country .footer { visibility: hidden; }
 .field-box { min-width: 0; }
 .field-box input { width: 0; }
 .ym-box select:first-of-type { width: 0; }
+
+/* reloading data inside a country (period, area or cell changed): a clear pill in the middle of the screen */
+.cv-loading {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 40; margin: 0;
+  padding: 12px 20px; border-radius: 999px; font-size: 13px; color: var(--title);
+  background: var(--card-solid); border: 1px solid rgba(255, 186, 8, 0.55);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), 0 0 30px rgba(232, 93, 4, 0.25); pointer-events: none;
+}
+body.is-loading-country .cv-loading { display: none; }
