@@ -13,6 +13,25 @@ uvicorn app.main:app --reload
 python -m pytest -q
 ```
 
+## API (`app/main.py`, `app/api/`)
+All routes are `GET`, return JSON (except the CSV) and are documented at `/docs`.
+
+| Route | Parameters | Returns |
+|---|---|---|
+| `/api/calendario` | `bbox`, `desde=YYYY-MM`, `hasta=YYYY-MM` | Year × month cells, monthly median, peak month and colour scale |
+| `/api/anomalia` | `bbox`, `anio`, `mes` | The month against its historical median, percentile and rank |
+| `/api/focos` | `bbox`, `desde=YYYY-MM-DD`, `hasta=YYYY-MM-DD` | GeoJSON points (max. 5,000, most recent first; `total` and `truncado` tell if there are more) |
+| `/api/focos.csv` | same as `/api/focos` | CSV download (max. 50,000 rows) |
+| `/api/serie_armonizacion` | `bbox` (optional) | Monthly raw MODIS, raw VIIRS and harmonized series |
+| `/api/celdas` | `bbox`, `desde=YYYY-MM`, `hasta=YYYY-MM` | Sum per 0.1° tile, for the map grid |
+| `/api/metadata` | – | Coverage of the archive and of the recent data |
+
+`bbox` is always `west,south,east,north`. Errors are `{"error": code, "mensaje": text}` with `bbox_invalido`, `fecha_invalida`, `rango_muy_grande` (HTTP 400) or `sin_datos` (HTTP 404).
+
+Months after the archive come from the recent hotspots and carry `dias_con_datos` and `dias_mes`. An incomplete month is compared with the median projected to the full month (`conteo_proyectado`, `incompleto: true`). Medians, percentiles and the colour scale use only the complete months of the archive.
+
+Where the data is read from (`app/datos.py`), in this order: `DATOS_DIR` (environment variable) → `data/salida/` → the internet (`DATOS_URL`, by default the `datos-v1` release and the data branch; DuckDB reads the Parquet files in parts) → `data/ejemplo/`. The tests use `data/ejemplo/` and reproduce `data/ejemplo/respuestas_api/` exactly.
+
 ## Recent hotspots (FIRMS API) · `app/firms/`
 The historical series ends at `ultimo_mes_completo` (see `data/*/metadata.json`). `app/firms` fills the gap from the next month up to today with the **FIRMS API**, using the same sensor as the series (VIIRS S-NPP): standard processing (`VIIRS_SNPP_SP`) while available, then near real time (`VIIRS_SNPP_NRT`).
 
@@ -64,11 +83,6 @@ Large files are not bundled (the function must stay under 500 MB; `.vercelignore
 | A1 detections (~700 MB, 61 M rows) | `datos-v1` release (`detecciones_url` in `data/salida/metadata.json`) |
 | Recent hotspots | `nrt-latest` release (`archivos_nrt()`) |
 
-DuckDB needs a writable folder for the httpfs extension (only `/tmp` is writable in the function):
-```python
-con = duckdb.connect()
-con.execute("SET home_directory='/tmp'; SET extension_directory='/tmp/duckdb_ext'")
-con.execute("INSTALL httpfs; LOAD httpfs; SET enable_http_metadata_cache=true")
-```
+DuckDB needs a writable folder for the httpfs extension, and only the temporary folder is writable in the function: `app/datos.py` points `home_directory` and `extension_directory` there.
 
 Measured from a laptop against the `datos-v1` release (1 thread, cold): loading httpfs 1.5 s, file metadata 1.8 s, Morelos 2024–2025 (6,093 hotspots) 1.7 s, all of Mexico in April 2024 (92,925 hotspots) 2.2 s, 5,000 map points 1.1 s.
