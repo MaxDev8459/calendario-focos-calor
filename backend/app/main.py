@@ -43,4 +43,4 @@ app.include_router(router)
 def raiz():
     return {"nombre": app.title, "documentacion": "/docs",
             "rutas": ["/api/calendario", "/api/anomalia", "/api/focos", "/api/focos.csv",
-                      "/api/serie_armonizacion", "/api/celdas", "/api/metadata"]}
+                      "/api/serie_armonizacion", "/api/celdas", "/api/globo", "/api/metadata"]}

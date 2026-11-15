@@ -181,6 +181,38 @@ def test_sin_datos_en_el_mar(api):
     assert r.status_code == 404 and r.json()["error"] == "sin_datos"
 
 
+# ---------- B6 globo ----------
+def test_globo_suma_lo_mismo_que_las_celdas(api):
+    d = api.get("/api/globo", params={"desde": "2024-04", "hasta": "2024-04"}).json()
+    assert (d["desde"], d["hasta"], d["unidad"], d["malla_grados"]) == ("2024-04", "2024-04", "focos_armonizados", 0.5)
+    assert [p["iso_a2"] for p in d["paises"]] == ["MX"]
+    c = api.get("/api/celdas", params={"bbox": MEXICO, "desde": "2024-04", "hasta": "2024-04"}).json()
+    total = sum(x["conteo"] for x in c["celdas"])
+    assert sum(x["conteo"] for x in d["celdas"]) == pytest.approx(total, abs=1)
+    assert d["paises"][0]["conteo"] == pytest.approx(total, abs=1)
+    x = d["celdas"][0]
+    assert set(x) == {"lat", "lon", "conteo", "region"} and x["region"] == "central_america"
+    assert (x["lat"] * 2) % 1 == 0.5 and (x["lon"] * 2) % 1 == 0.5        # centro de una celda de 0.5°
+
+
+def test_globo_sin_periodo_son_los_ultimos_12_meses(api):
+    d = api.get("/api/globo").json()
+    assert (d["desde"], d["hasta"]) == ("2025-01", "2025-12") and d["celdas"]
+
+
+def test_globo_incluye_focos_recientes_solo_si_el_periodo_los_pide(api_con_recientes):
+    d = api_con_recientes.get("/api/globo", params={"desde": "2026-11", "hasta": "2026-11"}).json()
+    assert d["paises"] == [{"iso_a2": "MX", "conteo": 2}]
+    d = api_con_recientes.get("/api/globo", params={"desde": "2025-12", "hasta": "2025-12"}).json()
+    assert d["paises"][0]["conteo"] > 0
+
+
+@pytest.mark.parametrize("params", [{"desde": "2025-13"}, {"desde": "2025-12", "hasta": "2025-01"}, {"hasta": "2025"}])
+def test_globo_fecha_invalida(api, params):
+    r = api.get("/api/globo", params=params)
+    assert r.status_code == 400 and r.json()["error"] == "fecha_invalida"
+
+
 # ---------- extras y CORS ----------
 def test_celdas_por_cuadro(api):
     d = api.get("/api/celdas", params={"bbox": MORELOS, "desde": "2024-04", "hasta": "2024-04"}).json()

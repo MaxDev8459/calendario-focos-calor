@@ -43,6 +43,11 @@ def celdas(bbox: str | None = None, desde: str | None = None, hasta: str | None 
     return consultas.celdas(leer_bbox(bbox), leer_mes(desde), leer_mes(hasta))
 
 
+@router.get("/globo")
+def globo(desde: str | None = None, hasta: str | None = None):
+    return consultas.globo(leer_mes(desde), leer_mes(hasta))
+
+
 @router.get("/metadata")
 def metadata():
     return consultas.metadata()

@@ -9,6 +9,7 @@ import io
 from datetime import date
 
 from .. import datos
+from . import globo as _globo
 from .validar import ErrorApi, cuadros
 
 CAMBIO = (2012, 2)            # VIIRS S-NPP completo desde febrero de 2012 (contrato, A2)
@@ -227,6 +228,34 @@ def focos_geojson(bbox, desde: date, hasta: date) -> dict:
                           "properties": {"fecha": fe.isoformat(), "sensor": se, "frp_mw": frp, "confianza": co,
                                          "hora_utc": ho, "dia_noche": dn}}
                          for fe, ho, lat, lon, se, frp, co, dn in filas]}
+
+
+def globo(desde=None, hasta=None) -> dict:
+    """B6: conteos armonizados de toda América en celdas de 0.5° y por país (globo de la portada).
+
+    Sin periodo, usa los 12 meses que terminan en el último mes completo del histórico. Los focos
+    recientes (NRT) solo se suman si el periodo pasa del histórico.
+    """
+    f = datos.fuentes()
+    ultimo = _ym(f["metadata"]["ultimo_mes_completo"])
+    hasta = hasta or ultimo
+    desde = desde or ((hasta[0], 1) if hasta[1] == 12 else (hasta[0] - 1, hasta[1] + 1))
+    if desde > hasta:
+        raise ErrorApi("fecha_invalida")
+    rutas = [f["conteos"]]
+    rec = datos.nrt() if hasta > ultimo else None
+    if rec:
+        rutas.append(rec["conteos"])
+    cur = datos.cursor(*rutas)
+    try:
+        return _globo.globo(cur, rutas, _txt(desde), _txt(hasta))
+    except ValueError as e:
+        raise ErrorApi("fecha_invalida") from e
+    except Exception as e:
+        if len(rutas) == 1:
+            raise
+        datos.log.warning("No se pudieron leer los focos recientes para el globo: %s", e)  # el histórico sigue
+        return _globo.globo(datos.cursor(rutas[0]), rutas[:1], _txt(desde), _txt(hasta))
 
 
 def metadata() -> dict:
