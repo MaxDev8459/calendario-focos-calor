@@ -34,6 +34,12 @@ const OMT = "https://tiles.openfreemap.org/planet";
 const GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
 const NAME = ["coalesce", ["get", "name:en"], ["get", "name_en"], ["get", "name"]]; // English names first (M1)
 
+// The Americas are drawn twice: simple 110m shapes for the whole globe and detailed 50m shapes when
+// zoomed in. Without a hand-over both outlines show and the borders look doubled, so from zoom 2.8 to 3.4
+// the simple shapes of the Americas fade out exactly while the detailed ones fade in.
+const AMERICAS = ["in", ["get", "region"], ["literal", ["north_america", "central_america", "caribbean", "south_america"]]];
+const handOver = (v) => ["interpolate", ["linear"], ["zoom"], 2.8, v, 3.4, ["case", AMERICAS, 0, v]];
+
 // Colours per theme and mode. Night = amber glass over the heat waves; day = paper and ink.
 const PALETTE = {
   night: {
@@ -117,17 +123,17 @@ export function initGlobe(container, world, { onCountryClick, onCountryHover } =
     layers: [
       { id: "ocean", type: "background", paint: { "background-color": P0.ocean } },
       { id: "grat", type: "line", source: "grat", paint: { "line-color": P0.grat, "line-width": 0.7 } },
-      { id: "land", type: "fill", source: "countries", paint: { "fill-color": ["case", ["get", "active"], P0.land, P0.landInactive], "fill-antialias": true } },
-      { id: "land-hover", type: "fill", source: "countries", paint: { "fill-color": P0.hover, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0] } },
+      { id: "land", type: "fill", source: "countries", paint: { "fill-color": ["case", ["get", "active"], P0.land, P0.landInactive], "fill-antialias": true, "fill-opacity": handOver(1) } },
+      { id: "land-hover", type: "fill", source: "countries", paint: { "fill-color": P0.hover, "fill-opacity": handOver(["case", ["boolean", ["feature-state", "hover"], false], 1, 0]) } },
       // live detail (OpenFreeMap / OpenMapTiles), from zoom 3 so the globe stays clean
       { id: "omt-water", type: "fill", source: "omt", "source-layer": "water", minzoom: 3, paint: { "fill-color": P0.water, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0, 4, 1] } },
       { id: "omt-river", type: "line", source: "omt", "source-layer": "waterway", minzoom: 5, paint: { "line-color": P0.water, "line-width": 0.8 } },
       { id: "omt-road", type: "line", source: "omt", "source-layer": "transportation", minzoom: 5, filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary"]]], paint: { "line-color": P0.road, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.4, 10, 1.4] } },
       { id: "omt-state", type: "line", source: "omt", "source-layer": "boundary", minzoom: 3.5, filter: ["all", ["==", ["get", "admin_level"], 4], ["!=", ["get", "maritime"], 1]], paint: { "line-color": P0.state, "line-width": 0.7, "line-dasharray": [3, 3] } },
-      { id: "border-glow", type: "line", source: "countries", filter: ["==", ["get", "active"], true], paint: { "line-color": P0.glow, "line-width": 5, "line-blur": 4 } },
-      { id: "border", type: "line", source: "countries", paint: { "line-color": ["case", ["get", "active"], P0.border, P0.borderInactive], "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.9, 5, 1.6, 8, 2.2] } },
-      { id: "focus-glow", type: "line", source: "countries", filter: ["==", ["get", "iso2"], ""], paint: { "line-color": "#ffba08", "line-width": 9, "line-blur": 7, "line-opacity": 0.7 } },
-      { id: "focus-line", type: "line", source: "countries", filter: ["==", ["get", "iso2"], ""], paint: { "line-color": "#ffd46a", "line-width": 1.6 } },
+      { id: "border-glow", type: "line", source: "countries", filter: ["==", ["get", "active"], true], paint: { "line-color": P0.glow, "line-width": 5, "line-blur": 4, "line-opacity": handOver(1) } },
+      { id: "border", type: "line", source: "countries", paint: { "line-color": ["case", ["get", "active"], P0.border, P0.borderInactive], "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.9, 5, 1.6, 8, 2.2], "line-opacity": handOver(1) } },
+      { id: "focus-glow", type: "line", source: "countries", filter: ["==", ["get", "iso2"], ""], paint: { "line-color": "#ffba08", "line-width": 9, "line-blur": 7, "line-opacity": handOver(0.7) } },
+      { id: "focus-line", type: "line", source: "countries", filter: ["==", ["get", "iso2"], ""], paint: { "line-color": "#ffd46a", "line-width": 1.6, "line-opacity": handOver(1) } },
       { id: "arcs", type: "line", source: "arcs", layout: { "line-cap": "round" }, paint: { "line-color": "#fff0c8", "line-width": 1.6, "line-blur": 0.6, "line-opacity": 0.85, "line-dasharray": [0, 4, 3] } },
       {
         id: "hot-glow", type: "circle", source: "hot",
@@ -205,6 +211,9 @@ export function initGlobe(container, world, { onCountryClick, onCountryHover } =
       const P = pal();
       map.addLayer({ id: "land50", type: "fill", source: "americas", minzoom: 2.8, paint: { "fill-color": P.land, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 2.8, 0, 3.4, 1] } }, "land-hover");
       map.addLayer({ id: "border50", type: "line", source: "americas", minzoom: 2.8, paint: { "line-color": P.border, "line-width": ["interpolate", ["linear"], ["zoom"], 3, 1.2, 6, 1.8, 9, 2.4], "line-opacity": ["interpolate", ["linear"], ["zoom"], 2.8, 0, 3.4, 1] } }, "focus-glow");
+      const fade50 = (v) => ["interpolate", ["linear"], ["zoom"], 2.8, 0, 3.4, v];
+      map.addLayer({ id: "focus50-glow", type: "line", source: "americas", minzoom: 2.8, filter: ["==", ["get", "iso2"], focusIso], paint: { "line-color": "#ffba08", "line-width": 9, "line-blur": 7, "line-opacity": fade50(0.7) } }, "arcs");
+      map.addLayer({ id: "focus50-line", type: "line", source: "americas", minzoom: 2.8, filter: ["==", ["get", "iso2"], focusIso], paint: { "line-color": "#ffd46a", "line-width": 2, "line-opacity": fade50(1) } }, "arcs");
       map.addLayer({ id: "land50-hover", type: "fill", source: "americas", minzoom: 2.8, paint: { "fill-color": P.hover, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.8, 0] } }, "omt-water");
       applyTheme();
     }).catch(() => {}),
@@ -235,8 +244,8 @@ export function initGlobe(container, world, { onCountryClick, onCountryHover } =
     setPaint("omt-road", "line-color", P.road);
     setPaint("omt-state", "line-color", P.state);
     for (const id of ["omt-country-label", "omt-state-label", "omt-city-label"]) { setPaint(id, "text-color", P.label); setPaint(id, "text-halo-color", P.halo); }
-    setPaint("focus-line", "line-color", day ? "#9d0208" : "#ffd46a");
-    setPaint("focus-glow", "line-color", day ? "#e85d04" : "#ffba08");
+    for (const id of ["focus-line", "focus50-line"]) setPaint(id, "line-color", day ? "#9d0208" : "#ffd46a");
+    for (const id of ["focus-glow", "focus50-glow"]) setPaint(id, "line-color", day ? "#e85d04" : "#ffba08");
     setPaint("arcs", "line-color", day ? "#c2410c" : "#fff0c8");
     setPaint("hot-glow", "circle-opacity", ["case", ["get", "active"], day ? 0.35 : 0.55, 0.25]);
     for (const id of ["hot-glow", "hot-core", "arcs"]) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", countryMode ? "none" : "visible");
@@ -409,7 +418,7 @@ export function initGlobe(container, world, { onCountryClick, onCountryHover } =
   function setFocus(iso) {
     focusIso = iso ?? "";
     whenReady(() => {
-      for (const id of ["focus-glow", "focus-line"]) map.setFilter(id, ["==", ["get", "iso2"], focusIso]);
+      for (const id of ["focus-glow", "focus-line", "focus50-glow", "focus50-line"].filter((l) => map.getLayer(l))) map.setFilter(id, ["==", ["get", "iso2"], focusIso]);
     });
   }
   function enterCountry(bbox, { padding, duration = 1600 } = {}) {
