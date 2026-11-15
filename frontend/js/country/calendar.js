@@ -50,8 +50,11 @@ export function renderCalendar(el, data, opts) {
         const col = binColor(v, cuts);
         const isFocus = opts.focus && opts.focus.y === y && opts.focus.m === m;
         const isMax = max && max.anio === y && max.mes === m;
-        const cls = ["cal-c", v == null ? "is-null" : "", inRange(y, m) ? "" : "is-out", isMax ? "is-max" : "", isFocus ? "is-focus" : ""].filter(Boolean).join(" ");
-        const label = v == null ? T.country.calendar.readoutNull(monthName(m), y) : T.country.calendar.readout(monthName(m), y, fmtInt(v), med[i] ? fmtPct(anomalyPct(v, med[i])) : "");
+        const prelim = v != null && c?.preliminar;
+        const cls = ["cal-c", v == null ? "is-null" : "", prelim ? "is-prelim" : "", inRange(y, m) ? "" : "is-out", isMax ? "is-max" : "", isFocus ? "is-focus" : ""].filter(Boolean).join(" ");
+        const cal = T.country.calendar;
+        const prelimTxt = !prelim ? "" : c.dias_con_datos != null && c.dias_mes != null && c.dias_con_datos < c.dias_mes ? cal.prelimDays(c.dias_con_datos, c.dias_mes) : cal.preliminary;
+        const label = v == null ? cal.readoutNull(monthName(m), y) : cal.readout(monthName(m), y, fmtInt(v), med[i] ? fmtPct(anomalyPct(v, med[i])) : "") + (prelimTxt ? ` · ${prelimTxt}` : "");
         return `<span role="gridcell" class="${cls}" tabindex="${isFocus ? 0 : -1}" data-y="${y}" data-m="${m}" aria-label="${label}" aria-selected="${isFocus}" ${col ? `style="--c:${col}"` : ""}>${expanded && v != null ? `<span class="v num">${fmtNum(v)}</span>` : ""}</span>`;
       }).join("");
       return `<div class="cal-row${seam}" role="row"><span class="cal-y mono" role="rowheader">${y}</span>${tds}</div>`;
@@ -70,6 +73,7 @@ export function renderCalendar(el, data, opts) {
       <p class="cal-readout mono" aria-live="polite" data-readout></p>
       <p class="sr-only" id="cal-summary-${expanded ? "x" : "c"}">${summary}</p>
       ${stepLegendHTML(cuts, calColors())}
+      ${data.celdas.some((c) => c.preliminar && c.conteo != null) ? `<p class="muted small cal-prelim-note">${T.country.calendar.prelimNote}</p>` : ""}
       <p class="cal-null-key mono"><i class="hatch" aria-hidden="true"></i>${T.country.calendar.noData}</p>
     </div>`;
 

@@ -24,6 +24,7 @@ export function completeAnomaly(a, calendar) {
     const mid = sorted.length >> 1;
     out.conteo = cell?.conteo ?? null;
     out.fuente = cell?.fuente ?? null;
+    out.preliminar = !!cell?.preliminar;
     out.mediana = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
     out.anomalia = anomalyPct(out.conteo, out.mediana);
     for (const k of ["promedio", "anomalia_vs_promedio", "total_anios", "lugar", "percentil", "linea_base"]) out[k] = null;
@@ -54,6 +55,7 @@ export function renderAnomaly(el, a) {
   el.innerHTML = `
     <div class="card-head">
       <h3 class="label">${t.title}</h3>
+      ${a.preliminar ? `<span class="sample-chip prelim-chip" title="${t.prelimNote}">${t.preliminary}</span>` : ""}
       <button type="button" class="icon-btn tip-btn" aria-describedby="anom-baseline" aria-label="${t.baselineShort}">${icons.info}</button>
       <span role="tooltip" id="anom-baseline" class="tip-pop">${t.baseline(monthName(a.mes), a.linea_base?.desde, a.linea_base?.hasta, a.total_anios)}</span>
     </div>
@@ -63,6 +65,7 @@ export function renderAnomaly(el, a) {
         <p>${t.vsMedian(monthName(a.mes), a.anio, fmtNum(a.mediana))}</p>
         <p>${pctMean == null ? t.undefinedBaseline : t.vsMean(fmtPct(pctMean), fmtNum(a.promedio))}</p>
         <p class="muted">${t.count(fmtInt(a.conteo))}${word ? ` · ${word}` : ""}</p>
+        ${a.preliminar ? `<p class="muted small">${a.incompleto && a.dias_con_datos != null ? t.prelimDays(a.dias_con_datos, a.dias_mes, fmtInt(a.conteo_proyectado ?? a.conteo)) : t.prelimNote}</p>` : ""}
       </div>
     </div>
     <div class="div-scale" aria-hidden="true">

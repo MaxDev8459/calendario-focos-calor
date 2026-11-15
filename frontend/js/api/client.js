@@ -67,12 +67,15 @@ async function withFallback(real, sample) {
 }
 
 // ---------- normalizers (contract v0.3 → internal)
+// Contract v0.4: NOAA-20 months (VIIRS_NRT_N20) and incomplete months are preliminary.
+export const isPreliminary = (x) => !!x && (x.preliminar === true || x.incompleto === true || x.fuente === "VIIRS_NRT_N20" || (x.dias_con_datos != null && x.dias_mes != null && x.dias_con_datos < x.dias_mes));
 function normCalendar(d) {
-  return { ...d, promedio_mensual: d.promedio_mensual ?? null };
+  return { ...d, celdas: (d.celdas ?? []).map((c) => ({ ...c, preliminar: isPreliminary(c) })), promedio_mensual: d.promedio_mensual ?? null };
 }
 function normAnomaly(d) {
   return {
     ...d,
+    preliminar: isPreliminary(d),
     anomalia: d.anomalia ?? d.anomalia_pct ?? null,
     total_anios: d.total_anios ?? d.de_anios ?? null,
     anomalia_vs_promedio: d.anomalia_vs_promedio ?? d.anomalia_vs_promedio_pct ?? null,

@@ -339,7 +339,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
           <span class="muted small">${t.detectedSub(fmtMonthKey(s.from), fmtMonthKey(s.to))}</span>
         </div>
         <div class="dr">
-          <span class="label">${t.last7}</span>
+          <span class="label">${t.last7} <span class="sample-chip prelim-chip" title="${T.country.anomaly.prelimNote}">${t.preliminary}</span></span>
           <span class="num huge" data-last7>${s.last7 ? fmtInt(s.last7.total) + (s.last7.capped ? "+" : "") : "…"}</span>
           <span class="muted small">${s.last7 ? t.last7Sub(fmtDateTime(s.last7.actualizado)) : ""}</span>
         </div>

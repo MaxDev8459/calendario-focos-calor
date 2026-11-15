@@ -418,6 +418,9 @@
 .cal-c:hover { filter: brightness(1.35); z-index: 1; outline: 1px solid rgba(255, 244, 228, 0.8); }
 .cal-c.is-null { background: var(--hatch), var(--null-bg); cursor: default; }
 .cal-c.is-out { opacity: 0.35; }
+.cal-c.is-prelim { background-image: repeating-linear-gradient(135deg, transparent 0 2px, rgba(255, 244, 228, 0.55) 2px 3px); }
+.cal-prelim-note { margin-top: 6px; }
+.prelim-chip { font-size: 9.5px; padding: 2px 7px; margin-left: 6px; vertical-align: middle; flex: none; }
 .cal-c.is-max { outline: 1.5px solid #fff4e4; z-index: 2; box-shadow: 0 0 8px rgba(255, 244, 228, 0.8); }
 .cal-c.is-focus { outline: 2px solid var(--accent); z-index: 3; box-shadow: 0 0 10px var(--accent); }
 .cal-c:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; z-index: 4; border-radius: 1px; }
