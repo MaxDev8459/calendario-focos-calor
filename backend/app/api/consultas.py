@@ -89,16 +89,28 @@ class Serie:
             meses_nrt = {(d.year, d.month) for fu in m_rec.get("fuentes", []) if fu["fuente"].endswith("_NRT")
                          for d in (date.fromisoformat(fu["desde"]), date.fromisoformat(fu["hasta"]))}
             primero_nrt = min(meses_nrt) if meses_nrt else None
+            # Meses con días de NOAA-20 llevado a S-NPP (contrato v0.4): fuente propia y `preliminar`.
+            meses_n20 = set((m_rec.get("noaa20") or {}).get("meses", []))
             for clave, (dias, total) in sorted(m_rec.get("dias_por_mes", {}).items()):
                 am = _ym(clave)
                 if am <= self.ultimo:
                     continue
                 c = nrt.get(am, (0.0, None, None))[0]
+                fuente = ("VIIRS_NRT_N20" if clave in meses_n20
+                          else "VIIRS_NRT" if primero_nrt and am >= primero_nrt else "VIIRS")
                 self.celdas[am] = {"anio": am[0], "mes": am[1],
                                    "conteo": round(c or 0.0, 1) if dias else None,
-                                   "fuente": "VIIRS_NRT" if primero_nrt and am >= primero_nrt else "VIIRS",
-                                   "dias_con_datos": dias, "dias_mes": total}
+                                   "fuente": fuente, "dias_con_datos": dias, "dias_mes": total}
+                if clave in meses_n20:
+                    self.celdas[am]["preliminar"] = True
                 self.crudos[am] = (None, int(c or 0) if dias else None)
+            # Meses recientes sin registro en metadata_nrt (huecos): sin datos, no cero.
+            siguiente = (self.ultimo[0] + 1, 1) if self.ultimo[1] == 12 else (self.ultimo[0], self.ultimo[1] + 1)
+            for am in _meses(siguiente, max(self.celdas)):
+                if am not in self.celdas:
+                    self.celdas[am] = {"anio": am[0], "mes": am[1], "conteo": None, "fuente": "VIIRS",
+                                       "dias_con_datos": 0, "dias_mes": calendar.monthrange(*am)[1]}
+                    self.crudos[am] = (None, None)
         self.fin = max(self.celdas)
 
     def mediana_mensual(self):
@@ -137,6 +149,8 @@ def anomalia(bbox, anio: int, mes: int) -> dict:
            "anomalia_pct": round(100 * (comparado - med) / med, 1) if med else None,
            "percentil": round(100 * sum(1 for v in vals if v < comparado) / len(vals)),
            "lugar": vals.index(comparado) + 1, "de_anios": len(vals), "fuente": actual["fuente"]}
+    if actual.get("preliminar"):
+        out["preliminar"] = True
     if reciente:
         out.update(dias_con_datos=actual["dias_con_datos"], dias_mes=actual["dias_mes"], incompleto=incompleto)
         if incompleto:
@@ -221,13 +235,20 @@ def focos_csv(bbox, desde: date, hasta: date) -> str:
 def focos_geojson(bbox, desde: date, hasta: date) -> dict:
     cur, sql, valores = _consulta_focos(bbox, desde, hasta)
     total = cur.execute(f"SELECT count(*) FROM ({sql})", valores).fetchall()[0][0]
-    filas = cur.execute(f"SELECT fecha, hora_utc, lat, lon, sensor, frp_mw, confianza, dia_noche FROM ({sql}) "
+    filas = cur.execute(f"SELECT fecha, hora_utc, lat, lon, sensor, frp_mw, confianza, dia_noche, satelite FROM ({sql}) "
                         f"ORDER BY fecha DESC, hora_utc DESC LIMIT {MAX_PUNTOS_MAPA}", valores).fetchall()
+
+    def propiedades(fe, ho, se, frp, co, dn, sat):
+        p = {"fecha": fe.isoformat(), "sensor": se, "frp_mw": frp, "confianza": co, "hora_utc": ho,
+             "dia_noche": dn, "satelite": sat}
+        if sat == "NOAA20":          # días sin S-NPP llenados con NOAA-20 (contrato v0.4)
+            p["preliminar"] = True
+        return p
+
     return {"type": "FeatureCollection", "total": total, "truncado": total > MAX_PUNTOS_MAPA,
             "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]},
-                          "properties": {"fecha": fe.isoformat(), "sensor": se, "frp_mw": frp, "confianza": co,
-                                         "hora_utc": ho, "dia_noche": dn}}
-                         for fe, ho, lat, lon, se, frp, co, dn in filas]}
+                          "properties": propiedades(fe, ho, se, frp, co, dn, sat)}
+                         for fe, ho, lat, lon, se, frp, co, dn, sat in filas]}
 
 
 def globo(desde=None, hasta=None) -> dict:
@@ -265,4 +286,6 @@ def metadata() -> dict:
     if rec:
         m = rec["metadata"]
         out["recientes"] = {k: m.get(k) for k in ("generado", "paises", "desde", "hasta", "fuentes", "dias_por_mes", "dias_sin_datos")}
+        if m.get("noaa20"):
+            out["recientes"]["noaa20"] = m["noaa20"]
     return out

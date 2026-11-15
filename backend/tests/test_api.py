@@ -55,6 +55,23 @@ def api_con_recientes(api, tmp_path):
     return api
 
 
+@pytest.fixture
+def api_con_noaa20(api, tmp_path):
+    """Noviembre de 2026: 2 días de S-NPP y 2 de NOAA-20 (factor 0.8), marcado preliminar."""
+    base = dict(hora_utc="0742", lat=18.73412, lon=-99.10233, pais="Mexico", sensor="VIIRS",
+                confianza="nominal", frp_mw=3.2, dia_noche="N", ty=187, tx=-992, es_nrt=True)
+    det = pd.DataFrame([{**base, "fecha": date(2026, 11, d), "satelite": "SNPP", "es_n20": False, "peso": 1.0} for d in (1, 2)]
+                       + [{**base, "fecha": date(2026, 11, d), "satelite": "NOAA20", "es_n20": True, "peso": 0.8} for d in (3, 4)])
+    escribir_parquets(det, tmp_path / "nrt")
+    (tmp_path / "nrt" / "metadata_nrt.json").write_text(json.dumps({
+        "paises": ["Mexico"], "desde": "2026-11-01", "hasta": "2026-11-04",
+        "fuentes": [{"fuente": "VIIRS_SNPP_NRT", "desde": "2026-11-01", "hasta": "2026-11-02"}],
+        "dias_por_mes": {"2026-11": [4, 30]}, "dias_sin_datos": [],
+        "noaa20": {"fuente_api": "VIIRS_NRT_N20", "preliminar": True, "dias": ["2026-11-03", "2026-11-04"],
+                   "meses": ["2026-11"], "factores": {"Mexico": 0.8}}}), encoding="utf-8")
+    return api
+
+
 # ---------- B1 calendario ----------
 @pytest.mark.parametrize("bbox, archivo", [(MORELOS, "calendario_morelos.json"), (MEXICO, "calendario_mexico.json")])
 def test_calendario_igual_a_la_referencia(api, bbox, archivo):
@@ -84,6 +101,23 @@ def test_recientes_no_aplican_fuera_de_su_cobertura(api_con_recientes):
     """En un área sin focos recientes el calendario termina en el histórico (vacío no es cero)."""
     d = api_con_recientes.get("/api/calendario", params={"bbox": "-110.5,27,-109,28.5"}).json()
     assert d["hasta"] == "2025-12"
+
+
+def test_mes_con_noaa20_es_preliminar(api_con_noaa20):
+    d = api_con_noaa20.get("/api/calendario", params={"bbox": MORELOS}).json()
+    nov = {(c["anio"], c["mes"]): c for c in d["celdas"]}[(2026, 11)]
+    assert nov == {"anio": 2026, "mes": 11, "conteo": 3.6, "fuente": "VIIRS_NRT_N20", "preliminar": True,
+                   "dias_con_datos": 4, "dias_mes": 30}                      # 2 × 1 + 2 × 0.8
+    oct_ = {(c["anio"], c["mes"]): c for c in d["celdas"]}[(2026, 10)]
+    assert oct_["conteo"] is None and oct_["dias_con_datos"] == 0      # hueco sin registro: sin datos, no 0
+    a = api_con_noaa20.get("/api/anomalia", params={"bbox": MORELOS, "anio": 2026, "mes": 11}).json()
+    assert (a["fuente"], a["preliminar"], a["incompleto"], a["conteo_proyectado"]) == ("VIIRS_NRT_N20", True, True, 27.0)
+    f = api_con_noaa20.get("/api/focos", params={"bbox": MORELOS, "desde": "2026-11-01", "hasta": "2026-11-04"}).json()
+    props = {x["properties"]["fecha"]: x["properties"] for x in f["features"]}
+    assert props["2026-11-03"]["satelite"] == "NOAA20" and props["2026-11-03"]["preliminar"] is True
+    assert props["2026-11-01"]["satelite"] == "SNPP" and "preliminar" not in props["2026-11-01"]
+    m = api_con_noaa20.get("/api/metadata").json()
+    assert m["recientes"]["noaa20"]["factores"] == {"Mexico": 0.8}
 
 
 # ---------- B2 anomalía ----------
@@ -151,6 +185,13 @@ def test_serie_armonizacion(api):
     i = d["meses"].index("2012-01")
     assert d["viirs_crudo"][i] is None and d["viirs_crudo"][i + 1] is not None     # VIIRS empieza en feb-2012
     assert d["armonizado"] == [c["conteo"] for c in referencia("calendario_morelos.json")["celdas"]]
+
+
+def test_serie_con_meses_recientes_trae_su_crudo(api_con_recientes):
+    d = api_con_recientes.get("/api/serie_armonizacion", params={"bbox": MORELOS}).json()
+    i = d["meses"].index("2026-10")
+    assert (d["viirs_crudo"][i], d["viirs_crudo"][i + 1]) == (3, 2)        # octubre 3 celdas-día, noviembre 2
+    assert d["viirs_crudo"][d["meses"].index("2026-02")] == 0           # observado y sin focos
 
 
 def test_serie_sin_bbox_es_todo_el_territorio(api):

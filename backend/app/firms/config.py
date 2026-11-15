@@ -21,6 +21,9 @@ MAX_DIAS_POR_PETICION = 5
 # Primero el procesamiento estándar (SP, igual al archivo histórico) y después el casi tiempo real (NRT).
 FUENTES_PREFERIDAS = ("VIIRS_SNPP_SP", "VIIRS_SNPP_NRT")
 
+# NOAA-20 (mismo sensor VIIRS): solo llena los días sin S-NPP, llevado a unidades de S-NPP con un factor.
+FUENTES_N20 = ("VIIRS_NOAA20_SP", "VIIRS_NOAA20_NRT")
+
 
 def map_key() -> str:
     """La llave nunca se escribe en logs, mensajes de error ni nombres de archivo."""
