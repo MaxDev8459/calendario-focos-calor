@@ -1,20 +1,22 @@
-// Holographic fire globe (M20, M23, M24, §4.3). globe.gl + Three.js.
-// Text never lives in the canvas (M2): tooltips and markers are HTML overlays positioned from 3D coords.
+// Live holographic globe (M20, M23, M24, §4.3) on MapLibre GL JS, globe projection.
+// One map serves the whole site: the glowing globe in the hero/story/explore and the flat country map.
+// Base geometry comes from our own Natural Earth files (always available); OpenFreeMap vector tiles add
+// names, coastlines, rivers, roads and state borders when the network allows. Text is never baked into
+// images: map labels are live text and every other label is an HTML overlay (M2).
 // AI-assisted code — see README "Use of AI".
-import * as THREE from "../../vendor/globe.js";
-const { Globe, UnrealBloomPass } = THREE;
+import * as maplibregl from "../../vendor/maplibre/maplibre-gl.mjs";
 import { RAMP, INACTIVE_GREY, VIIRS_BLUE } from "../config.js";
-import { state, on, reducedMotion, emit } from "../state.js";
+import { state, on, reducedMotion } from "../state.js";
+import { countryByIso } from "../util/geo.js";
 
-const R = 100; // three-globe radius
-
-// Camera altitude per layout (tuned so the globe radius ≈ 34% of the viewport height in the hero)
+// Camera per layout. alt is the old globe.gl altitude (distance in globe radii); it is turned into a
+// MapLibre zoom from the radius the globe should have on screen, so the composition is unchanged.
 const LAYOUTS = {
   hero: { alt: 2.3, x: 0, y: 0.02 },
   story: { alt: 2.25, x: -0.22, y: 0.03 },
   explore: { alt: 1.75, x: 0, y: 0.03 },
   coming: { alt: 2.15, x: 0, y: 0.02 },
-  country: { alt: 0.9, x: 0.0, y: 0 },
+  country: { alt: 0.9, x: 0, y: 0 },
   page: { alt: 2.6, x: 0.26, y: 0.02 },
 };
 // Phones: the globe sits lower and further away so titles stay readable over it.
@@ -26,143 +28,231 @@ const LAYOUTS_MOBILE = {
   page: { alt: 3.4, x: 0, y: 0.05 },
 };
 const layoutFor = (name) => (innerWidth < 768 && LAYOUTS_MOBILE[name]) || LAYOUTS[name] || LAYOUTS.hero;
+// screen radius (px) the old camera gave for an altitude: tan(asin(1/(1+alt))) / tan(25°) · H/2
+const radiusForAlt = (alt) => (Math.tan(Math.asin(1 / (1 + alt))) / Math.tan((25 * Math.PI) / 180)) * (innerHeight / 2);
 
-const EMBER_VERT = `
-attribute float aSize; attribute float aPhase; attribute float aFlicker; attribute vec3 aColor; attribute float aAlpha;
-uniform float uTime; uniform float uPx; uniform float uDay;
-varying vec3 vColor; varying float vAlpha;
-void main(){
-  vec4 wp = modelMatrix * vec4(position, 1.0);
-  float facing = dot(normalize(wp.xyz), normalize(cameraPosition));
-  vec4 mv = viewMatrix * wp;
-  float fl = 1.0 + aFlicker * 0.15 * sin(uTime * (6.2831 / (2.0 + 2.0 * fract(aPhase * 7.13))) + aPhase * 6.2831);
-  vColor = aColor * fl;
-  vAlpha = aAlpha * smoothstep(0.02, 0.22, facing);
-  gl_PointSize = aSize * uPx * (320.0 / -mv.z) * (uDay > 0.5 ? 0.55 : 1.0);
-  gl_Position = projectionMatrix * mv;
-}`;
-const EMBER_FRAG = `
-uniform float uDay;
-varying vec3 vColor; varying float vAlpha;
-void main(){
-  float d = length(gl_PointCoord - 0.5);
-  if (d > 0.5) discard;
-  float core = smoothstep(0.5, 0.0, d);
-  float a = uDay > 0.5 ? smoothstep(0.5, 0.36, d) : pow(core, 1.6);
-  vec3 c = uDay > 0.5 ? vColor : vColor + vec3(0.35, 0.22, 0.08) * pow(core, 6.0);
-  gl_FragColor = vec4(c, a * vAlpha);
-}`;
+const OMT = "https://tiles.openfreemap.org/planet";
+const GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
+const NAME = ["coalesce", ["get", "name:en"], ["get", "name_en"], ["get", "name"]]; // English names first (M1)
 
-function hexToRgb(h) {
-  const n = parseInt(h.slice(1), 16);
-  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+// Colours per theme and mode. Night = amber glass over the heat waves; day = paper and ink.
+const PALETTE = {
+  night: {
+    ocean: "rgba(120, 30, 8, 0.50)", land: "rgba(205, 80, 22, 0.42)", landInactive: "rgba(120, 58, 40, 0.30)",
+    border: "rgba(255, 176, 92, 0.82)", borderInactive: "rgba(255, 170, 80, 0.32)", glow: "rgba(255, 120, 30, 0.55)",
+    grat: "rgba(255, 170, 90, 0.16)", hover: "rgba(255, 186, 8, 0.30)", water: "rgba(60, 14, 6, 0.55)",
+    road: "rgba(255, 190, 120, 0.16)", state: "rgba(255, 190, 120, 0.28)", label: "#ffe9cf", halo: "rgba(40, 8, 4, 0.85)",
+    // country mode: darker, so the hexagons carry the colour
+    cOcean: "rgba(6, 3, 12, 0.72)", cLand: "rgba(46, 16, 12, 0.78)", cLandInactive: "rgba(30, 14, 14, 0.72)", cBorder: "rgba(255, 170, 90, 0.42)",
+  },
+  day: {
+    ocean: "rgba(240, 170, 120, 0.42)", land: "rgba(250, 214, 168, 0.85)", landInactive: "rgba(225, 205, 190, 0.7)",
+    border: "rgba(150, 60, 20, 0.85)", borderInactive: "rgba(150, 60, 20, 0.35)", glow: "rgba(232, 93, 4, 0.25)",
+    grat: "rgba(150, 60, 20, 0.14)", hover: "rgba(194, 65, 12, 0.22)", water: "rgba(215, 160, 120, 0.7)",
+    road: "rgba(150, 60, 20, 0.16)", state: "rgba(150, 60, 20, 0.3)", label: "#3a1a10", halo: "rgba(255, 246, 236, 0.9)",
+    cOcean: "rgba(236, 214, 196, 0.85)", cLand: "rgba(250, 238, 224, 0.92)", cLandInactive: "rgba(236, 226, 216, 0.9)", cBorder: "rgba(150, 60, 20, 0.45)",
+  },
+};
+
+function graticule(step = 15) {
+  const lines = [];
+  for (let lon = -180; lon < 180; lon += step) lines.push(Array.from({ length: 35 }, (_, i) => [lon, -85 + i * 5]));
+  for (let lat = -75; lat <= 75; lat += step) lines.push(Array.from({ length: 73 }, (_, i) => [-180 + i * 5, lat]));
+  return { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "MultiLineString", coordinates: lines } }] };
 }
+
+// point at angular distance d (rad) and bearing b (rad) from [lng, lat]
+function destination([lng, lat], d, b) {
+  const φ1 = (lat * Math.PI) / 180, λ1 = (lng * Math.PI) / 180;
+  const φ2 = Math.asin(Math.sin(φ1) * Math.cos(d) + Math.cos(φ1) * Math.sin(d) * Math.cos(b));
+  const λ2 = λ1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(φ1), Math.cos(d) - Math.sin(φ1) * Math.sin(φ2));
+  return [((((λ2 * 180) / Math.PI) + 540) % 360) - 180, (φ2 * 180) / Math.PI];
+}
+function angularDist([lng1, lat1], [lng2, lat2]) {
+  const r = Math.PI / 180;
+  const c = Math.sin(lat1 * r) * Math.sin(lat2 * r) + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.cos((lng2 - lng1) * r);
+  return Math.acos(Math.max(-1, Math.min(1, c)));
+}
+function greatCircle(a, b, n = 64) {
+  const d = angularDist(a, b);
+  if (!d) return [a, b];
+  const r = Math.PI / 180;
+  const [x1, y1, z1] = [Math.cos(a[1] * r) * Math.cos(a[0] * r), Math.cos(a[1] * r) * Math.sin(a[0] * r), Math.sin(a[1] * r)];
+  const [x2, y2, z2] = [Math.cos(b[1] * r) * Math.cos(b[0] * r), Math.cos(b[1] * r) * Math.sin(b[0] * r), Math.sin(b[1] * r)];
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+    const x = A * x1 + B * x2, y = A * y1 + B * y2, z = A * z1 + B * z2;
+    out.push([Math.atan2(y, x) / r, Math.atan2(z, Math.hypot(x, y)) / r]);
+  }
+  return out;
+}
+
+const rampStep = (prop) => {
+  const e = ["step", ["get", prop], RAMP[2]];
+  for (let i = 3; i < RAMP.length; i++) e.push((i - 2) / (RAMP.length - 2), RAMP[i]);
+  return e;
+};
 
 export function initGlobe(container, world, { onCountryClick, onCountryHover } = {}) {
   const stage = container.parentElement;
-  const g = new Globe(container, { animateIn: false, rendererConfig: { antialias: true, alpha: true, powerPreference: "high-performance" } });
-  const renderer = g.renderer();
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); // §10 cap DPR at 2
+  const day0 = state.theme === "day";
+  const P0 = PALETTE[day0 ? "day" : "night"];
 
-  // --- materials (night / day)
-  const nightMat = new THREE.MeshPhongMaterial({ color: 0x9a3a10, emissive: 0x4a1304, emissiveIntensity: 1, transparent: true, opacity: 0.62, shininess: 18, specular: 0x552200 });
-  const dayMat = new THREE.MeshPhongMaterial({ color: 0xf2b48c, emissive: 0xe7a77f, emissiveIntensity: 0.55, transparent: true, opacity: 0.72, shininess: 4 });
-
-  let hoverPoly = null;
-  const capColor = (d) => {
-    const day = state.theme === "day";
-    if (d === hoverPoly) return day ? "rgba(194,65,12,0.28)" : "rgba(255,186,8,0.22)";
-    if (!d.properties.active) return day ? "rgba(122,91,78,0.08)" : "rgba(80,40,30,0.18)";
-    return day ? "rgba(214,120,70,0.16)" : "rgba(255,120,40,0.07)";
+  const style = {
+    version: 8,
+    projection: { type: "globe" },
+    glyphs: GLYPHS,
+    sky: {
+      "sky-color": "rgba(0,0,0,0)", "horizon-color": "#ff6a1a", "fog-color": "#ff6a1a",
+      "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.6, "fog-ground-blend": 0.9,
+      "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 4, 0.8, 6, 0],
+    },
+    sources: {
+      countries: { type: "geojson", data: world, promoteId: "iso2" },
+      grat: { type: "geojson", data: graticule() },
+      omt: { type: "vector", url: OMT },
+      hot: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+      arcs: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+    },
+    layers: [
+      { id: "ocean", type: "background", paint: { "background-color": P0.ocean } },
+      { id: "grat", type: "line", source: "grat", paint: { "line-color": P0.grat, "line-width": 0.7 } },
+      { id: "land", type: "fill", source: "countries", paint: { "fill-color": ["case", ["get", "active"], P0.land, P0.landInactive], "fill-antialias": true } },
+      { id: "land-hover", type: "fill", source: "countries", paint: { "fill-color": P0.hover, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0] } },
+      // live detail (OpenFreeMap / OpenMapTiles), from zoom 3 so the globe stays clean
+      { id: "omt-water", type: "fill", source: "omt", "source-layer": "water", minzoom: 3, paint: { "fill-color": P0.water, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0, 4, 1] } },
+      { id: "omt-river", type: "line", source: "omt", "source-layer": "waterway", minzoom: 5, paint: { "line-color": P0.water, "line-width": 0.8 } },
+      { id: "omt-road", type: "line", source: "omt", "source-layer": "transportation", minzoom: 5, filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary"]]], paint: { "line-color": P0.road, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.4, 10, 1.4] } },
+      { id: "omt-state", type: "line", source: "omt", "source-layer": "boundary", minzoom: 3.5, filter: ["all", ["==", ["get", "admin_level"], 4], ["!=", ["get", "maritime"], 1]], paint: { "line-color": P0.state, "line-width": 0.7, "line-dasharray": [3, 3] } },
+      { id: "border-glow", type: "line", source: "countries", filter: ["==", ["get", "active"], true], paint: { "line-color": P0.glow, "line-width": 5, "line-blur": 4 } },
+      { id: "border", type: "line", source: "countries", paint: { "line-color": ["case", ["get", "active"], P0.border, P0.borderInactive], "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.7, 5, 1.2] } },
+      { id: "focus-glow", type: "line", source: "countries", filter: ["==", ["get", "iso2"], ""], paint: { "line-color": "#ffba08", "line-width": 9, "line-blur": 7, "line-opacity": 0.7 } },
+      { id: "focus-line", type: "line", source: "countries", filter: ["==", ["get", "iso2"], ""], paint: { "line-color": "#ffd46a", "line-width": 1.6 } },
+      { id: "arcs", type: "line", source: "arcs", layout: { "line-cap": "round" }, paint: { "line-color": "#fff0c8", "line-width": 1.6, "line-blur": 0.6, "line-opacity": 0.85, "line-dasharray": [0, 4, 3] } },
+      {
+        id: "hot-glow", type: "circle", source: "hot",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, ["+", 1.6, ["*", 4, ["get", "t"]]], 4, ["+", 4, ["*", 10, ["get", "t"]]], 7, ["+", 8, ["*", 18, ["get", "t"]]]],
+          "circle-color": ["case", ["get", "active"], rampStep("t"), INACTIVE_GREY],
+          "circle-blur": 1, "circle-opacity": ["case", ["get", "active"], 0.55, 0.25],
+          "circle-pitch-alignment": "map",
+        },
+      },
+      {
+        id: "hot-core", type: "circle", source: "hot",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, ["+", 0.5, ["*", 1.4, ["get", "t"]]], 4, ["+", 1.2, ["*", 3, ["get", "t"]]], 7, ["+", 2.5, ["*", 5, ["get", "t"]]]],
+          "circle-color": ["case", ["get", "active"], ["interpolate", ["linear"], ["get", "t"], 0, RAMP[4], 0.7, RAMP[8], 1, "#fff4e4"], INACTIVE_GREY],
+          "circle-opacity": ["case", ["get", "active"], ["+", 0.55, ["*", 0.45, ["get", "t"]]], 0.55],
+          "circle-pitch-alignment": "map",
+        },
+      },
+      {
+        id: "omt-country-label", type: "symbol", source: "omt", "source-layer": "place", minzoom: 2.6, filter: ["==", ["get", "class"], "country"],
+        layout: { "text-field": NAME, "text-font": ["Noto Sans Bold"], "text-size": ["interpolate", ["linear"], ["zoom"], 3, 11, 6, 15], "text-transform": "uppercase", "text-letter-spacing": 0.18, "text-max-width": 8 },
+        paint: { "text-color": P0.label, "text-halo-color": P0.halo, "text-halo-width": 1.4, "text-opacity": ["interpolate", ["linear"], ["zoom"], 2.6, 0, 3.2, 0.9] },
+      },
+      {
+        id: "omt-state-label", type: "symbol", source: "omt", "source-layer": "place", minzoom: 4.5, filter: ["==", ["get", "class"], "state"],
+        layout: { "text-field": NAME, "text-font": ["Noto Sans Italic"], "text-size": 11, "text-letter-spacing": 0.08, "text-max-width": 7 },
+        paint: { "text-color": P0.label, "text-halo-color": P0.halo, "text-halo-width": 1.2, "text-opacity": 0.75 },
+      },
+      {
+        id: "omt-city-label", type: "symbol", source: "omt", "source-layer": "place", minzoom: 5, filter: ["in", ["get", "class"], ["literal", ["city", "town"]]],
+        layout: { "text-field": NAME, "text-font": ["Noto Sans Regular"], "text-size": ["interpolate", ["linear"], ["zoom"], 5, 10, 9, 13], "symbol-sort-key": ["get", "rank"], "text-max-width": 8 },
+        paint: { "text-color": P0.label, "text-halo-color": P0.halo, "text-halo-width": 1.2, "text-opacity": 0.85 },
+      },
+    ],
   };
-  const strokeColor = (d) => {
-    const day = state.theme === "day";
-    if (day) return d.properties.active ? "rgba(150,60,20,0.85)" : "rgba(150,60,20,0.4)";
-    return d.properties.active ? "rgba(255,170,80,0.78)" : "rgba(255,170,80,0.35)";
-  };
 
-  g.backgroundColor("rgba(0,0,0,0)")
-    .showAtmosphere(true)
-    .atmosphereColor("#FF6A1A")
-    .atmosphereAltitude(0.2)
-    .showGraticules(true)
-    .globeMaterial(nightMat)
-    .polygonsData(world.features)
-    .polygonCapColor(capColor)
-    .polygonSideColor(() => "rgba(0,0,0,0)")
-    .polygonStrokeColor(strokeColor)
-    .polygonAltitude((d) => (d === hoverPoly ? 0.018 : 0.006))
-    .polygonsTransitionDuration(reducedMotion ? 0 : 300)
-    .polygonLabel(() => null)
-    .onPolygonHover((d) => {
-      hoverPoly = d;
-      g.polygonCapColor(capColor).polygonAltitude((p) => (p === hoverPoly ? 0.018 : 0.006));
-      container.style.cursor = d ? "pointer" : "grab";
-      onCountryHover?.(d);
-    })
-    .onPolygonClick((d) => onCountryClick?.(d))
-    .onGlobeClick(() => onCountryHover?.(null));
-
-  // lights: warm key light so the glass reads as amber
-  const scene = g.scene();
-  scene.children.filter((c) => c.isLight).forEach((l) => scene.remove(l));
-  scene.add(new THREE.AmbientLight(0xffd2a8, 1.6));
-  const key = new THREE.DirectionalLight(0xffb070, 1.4);
-  key.position.set(-1, 0.6, 1);
-  scene.add(key);
-
-  // --- bloom (night only)
-  let bloom = null;
-  try {
-    bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.95, 0.55, 0.12);
-    g.postProcessingComposer().addPass(bloom);
-  } catch (e) { bloom = null; }
-
-  // --- embers (custom points layer)
-  const emberMat = new THREE.ShaderMaterial({
-    vertexShader: EMBER_VERT, fragmentShader: EMBER_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { uTime: { value: 0 }, uPx: { value: renderer.getPixelRatio() }, uDay: { value: 0 } },
+  const startZoom = 1.8;
+  const map = new maplibregl.Map({
+    container,
+    style,
+    center: [-78, 20],
+    zoom: startZoom,
+    minZoom: 0.4,
+    maxZoom: 11,
+    maxPitch: 0,
+    dragRotate: false,
+    pitchWithRotate: false,
+    touchPitch: false,
+    attributionControl: false,
+    renderWorldCopies: false,
+    pixelRatio: Math.min(2, window.devicePixelRatio || 1), // §10 cap DPR at 2
+    canvasContextAttributes: { antialias: true, alpha: true, preserveDrawingBuffer: false },
+    fadeDuration: reducedMotion ? 0 : 300,
   });
-  let embers = null;
+  map.touchZoomRotate.disableRotation();
+  map.keyboard.disableRotation?.();
+  // OSM-derived detail only appears from zoom 3: the attribution follows it (ODbL)
+  const attrib = new maplibregl.AttributionControl({ compact: true });
+  map.addControl(attrib, "bottom-left");
+  const syncAttrib = () => container.classList.toggle("show-attrib", map.getZoom() >= 2.9);
+  map.on("zoomend", syncAttrib);
+  // tiles or glyphs can be blocked or offline: the globe keeps working with the local geometry
+  map.on("error", (e) => { if (!/omt|openfreemap|glyph|pbf|Failed to fetch|AJAXError/i.test(String(e?.error?.message ?? e?.error ?? ""))) console.warn("[map]", e?.error ?? e); });
 
+  let loaded = false;
+  const ready = new Promise((r) => map.once("load", () => { loaded = true; r(); }));
+  const whenReady = (fn) => (loaded ? fn() : ready.then(fn));
+
+  // Americas at 50m: sharper coasts and borders when zoomed in (and in the country view)
+  whenReady(() =>
+    fetch("./data/americas-50m.json").then((r) => r.json()).then((am) => {
+      for (const f of am.features) f.properties.active = true;
+      map.addSource("americas", { type: "geojson", data: am, promoteId: "iso2" });
+      const P = pal();
+      map.addLayer({ id: "land50", type: "fill", source: "americas", minzoom: 2.8, paint: { "fill-color": P.land, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 2.8, 0, 3.4, 1] } }, "land-hover");
+      map.addLayer({ id: "border50", type: "line", source: "americas", minzoom: 2.8, paint: { "line-color": P.border, "line-width": 1.1, "line-opacity": ["interpolate", ["linear"], ["zoom"], 2.8, 0, 3.4, 1] } }, "focus-glow");
+      map.addLayer({ id: "land50-hover", type: "fill", source: "americas", minzoom: 2.8, paint: { "fill-color": P.hover, "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.8, 0] } }, "omt-water");
+      applyTheme();
+    }).catch(() => {}),
+  );
+
+  // ---------- theme / mode paints
+  let countryMode = false;
+  const pal = () => PALETTE[state.theme === "day" ? "day" : "night"];
+  const setPaint = (id, prop, v) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, v); };
+  function applyTheme() {
+    const day = state.theme === "day";
+    const P = pal();
+    stage.classList.toggle("is-day", day);
+    stage.classList.toggle("is-country", countryMode);
+    if (!loaded) return;
+    setPaint("ocean", "background-color", countryMode ? P.cOcean : P.ocean);
+    setPaint("grat", "line-color", countryMode ? P.grat.replace(/[\d.]+\)$/, "0.08)") : P.grat);
+    setPaint("land", "fill-color", ["case", ["get", "active"], countryMode ? P.cLand : P.land, countryMode ? P.cLandInactive : P.landInactive]);
+    setPaint("land50", "fill-color", countryMode ? P.cLand : P.land);
+    setPaint("land-hover", "fill-color", P.hover);
+    setPaint("land50-hover", "fill-color", P.hover);
+    setPaint("border", "line-color", ["case", ["get", "active"], countryMode ? P.cBorder : P.border, P.borderInactive]);
+    setPaint("border50", "line-color", countryMode ? P.cBorder : P.border);
+    setPaint("border-glow", "line-color", P.glow);
+    setPaint("border-glow", "line-opacity", countryMode ? 0 : 1);
+    setPaint("omt-water", "fill-color", countryMode ? P.cOcean : P.water);
+    setPaint("omt-river", "line-color", countryMode ? P.cOcean : P.water);
+    setPaint("omt-road", "line-color", P.road);
+    setPaint("omt-state", "line-color", P.state);
+    for (const id of ["omt-country-label", "omt-state-label", "omt-city-label"]) { setPaint(id, "text-color", P.label); setPaint(id, "text-halo-color", P.halo); }
+    setPaint("focus-line", "line-color", day ? "#9d0208" : "#ffd46a");
+    setPaint("focus-glow", "line-color", day ? "#e85d04" : "#ffba08");
+    setPaint("arcs", "line-color", day ? "#c2410c" : "#fff0c8");
+    setPaint("hot-glow", "circle-opacity", ["case", ["get", "active"], day ? 0.35 : 0.55, 0.25]);
+    for (const id of ["hot-glow", "hot-core", "arcs"]) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", countryMode ? "none" : "visible");
+    map.setSky({ ...style.sky, "horizon-color": day ? "#f48c06" : "#ff6a1a", "fog-color": day ? "#f8c79a" : "#ff6a1a", "atmosphere-blend": countryMode ? 0 : style.sky["atmosphere-blend"] });
+    orbits.classList.toggle("is-day", day);
+  }
+  on("theme", applyTheme);
+
+  // ---------- hotspots (globe embers) and light arcs
   function setHotspots(cells) {
-    if (embers) { scene.remove(embers); embers.geometry.dispose(); }
-    const n = cells.length;
-    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), size = new Float32Array(n), phase = new Float32Array(n), flick = new Float32Array(n), alpha = new Float32Array(n);
     const active = cells.filter((c) => c.active).map((c) => c.conteo).sort((a, b) => a - b);
     const q = (v) => { let lo = 0, hi = active.length; while (lo < hi) { const m = (lo + hi) >> 1; if (active[m] < v) lo = m + 1; else hi = m; } return active.length ? lo / active.length : 0; };
-    const grey = hexToRgb(INACTIVE_GREY);
-    cells.forEach((c, i) => {
-      const p = g.getCoords(c.lat, c.lon, 0.008);
-      pos.set([p.x, p.y, p.z], i * 3);
-      if (c.active) {
-        const t = q(c.conteo);
-        const idx = Math.min(RAMP.length - 1, 2 + Math.floor(t * (RAMP.length - 2)));
-        col.set(hexToRgb(RAMP[idx]), i * 3);
-        size[i] = 1.6 + t * 3.4;
-        flick[i] = reducedMotion ? 0 : 1;
-        alpha[i] = 0.55 + 0.45 * t;
-      } else {
-        col.set(grey, i * 3);
-        size[i] = 1.5;
-        flick[i] = 0;
-        alpha[i] = 0.55; // §5.2 grey at 55%
-      }
-      phase[i] = Math.random();
-    });
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
-    geo.setAttribute("aSize", new THREE.BufferAttribute(size, 1));
-    geo.setAttribute("aPhase", new THREE.BufferAttribute(phase, 1));
-    geo.setAttribute("aFlicker", new THREE.BufferAttribute(flick, 1));
-    geo.setAttribute("aAlpha", new THREE.BufferAttribute(alpha, 1));
-    embers = new THREE.Points(geo, emberMat);
-    embers.renderOrder = 5;
-    scene.add(embers);
+    const fc = { type: "FeatureCollection", features: cells.map((c) => ({ type: "Feature", properties: { t: c.active ? q(c.conteo) : 0, active: !!c.active }, geometry: { type: "Point", coordinates: [c.lon, c.lat] } })) };
+    whenReady(() => map.getSource("hot").setData(fc));
   }
-
-  // --- light arcs between the 8 most active regions (§4.3.2)
   function setArcs(cells) {
     const bins = new Map();
     for (const c of cells) {
@@ -172,144 +262,232 @@ export function initGlobe(container, world, { onCountryClick, onCountryHover } =
       b.lat += c.lat * c.conteo; b.lon += c.lon * c.conteo; b.w += c.conteo;
       bins.set(k, b);
     }
-    const top = [...bins.values()].sort((a, b) => b.w - a.w).slice(0, 8).map((b) => ({ lat: b.lat / b.w, lng: b.lon / b.w }));
-    const arcs = top.map((a, i) => ({ s: a, e: top[(i + 3) % top.length] }));
-    g.arcsData(reducedMotion ? [] : arcs)
-      .arcStartLat((d) => d.s.lat).arcStartLng((d) => d.s.lng).arcEndLat((d) => d.e.lat).arcEndLng((d) => d.e.lng)
-      .arcColor(() => (state.theme === "day" ? ["rgba(194,65,12,0.1)", "rgba(194,65,12,0.85)", "rgba(194,65,12,0.1)"] : ["rgba(255,186,8,0.08)", "rgba(255,240,200,1)", "rgba(255,186,8,0.08)"]))
-      .arcStroke(0.32).arcAltitudeAutoScale(0.32)
-      .arcDashLength(0.28).arcDashGap(1.1).arcDashInitialGap(() => Math.random() * 1.4).arcDashAnimateTime(2800);
+    const top = [...bins.values()].sort((a, b) => b.w - a.w).slice(0, 8).map((b) => [b.lon / b.w, b.lat / b.w]);
+    const feats = reducedMotion ? [] : top.map((a, i) => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: greatCircle(a, top[(i + 3) % top.length]) } }));
+    whenReady(() => map.getSource("arcs").setData({ type: "FeatureCollection", features: feats }));
   }
 
-  // --- orbital rings (§4.3.3): kept facing the viewer so they read as ellipses
-  const ringGroup = new THREE.Group();
-  const mkRing = (r, dashed) => {
-    const pts = [];
-    for (let i = 0; i <= 256; i++) { const a = (i / 256) * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0)); }
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = dashed
-      ? new THREE.LineDashedMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.32, dashSize: 3, gapSize: 4 })
-      : new THREE.LineBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.38 });
-    const line = new THREE.Line(geo, mat);
-    if (dashed) line.computeLineDistances();
-    return line;
+  // ---------- orbital rings: an SVG overlay sized from the globe's radius on screen
+  const orbits = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  orbits.setAttribute("class", "orbits");
+  orbits.setAttribute("aria-hidden", "true");
+  orbits.innerHTML = `<g class="orb orb-a"><ellipse/></g><g class="orb orb-b"><ellipse/></g>`;
+  stage.append(orbits);
+
+  // ---------- globe geometry on screen
+  function centerPx() { const c = map.getCenter(); const p = map.project(c); const r = container.getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; }
+  function radiusPx() {
+    const c = map.getCenter();
+    const p0 = map.project(c);
+    const p1 = map.project(destination([c.lng, c.lat], (88 * Math.PI) / 180, Math.PI / 2));
+    return Math.hypot(p1.x - p0.x, p1.y - p0.y) / Math.sin((88 * Math.PI) / 180);
+  }
+  // Globe radius on screen grows as 2^zoom and, in MapLibre's globe, with the centre latitude
+  // (≈ cos(lat)^-0.78, measured). Calibrate once at low zoom so altitude→zoom stays right even
+  // when the map is currently zoomed deep into a country.
+  const latK = (lat) => Math.pow(Math.cos((Math.max(-80, Math.min(80, lat)) * Math.PI) / 180), 0.78);
+  let kRad = null;
+  function calibrate() {
+    if (map.getZoom() > 3.5) return;
+    const r = radiusPx();
+    if (r > 0) kRad = (r * latK(map.getCenter().lat)) / 2 ** map.getZoom();
+  }
+  const zoomForAlt = (alt, lat = map.getCenter().lat) => {
+    if (kRad == null) calibrate();
+    if (kRad == null) return startZoom;
+    return Math.max(0.2, Math.min(11, Math.log2((radiusForAlt(alt) * latK(lat)) / kRad)));
   };
-  const ringA = mkRing(R * 1.52, false);
-  const ringB = mkRing(R * 1.74, true);
-  const tiltA = new THREE.Group(); tiltA.rotation.set(1.28, 0.22, 0); tiltA.add(ringA);
-  const tiltB = new THREE.Group(); tiltB.rotation.set(1.36, -0.16, 0); tiltB.add(ringB);
-  ringGroup.add(tiltA, tiltB);
-  scene.add(ringGroup);
+  map.on("moveend", calibrate);
+  ready.then(calibrate);
+  const altForZoom = () => { const r = radiusPx(); const k = r / ((innerHeight / 2) / Math.tan((25 * Math.PI) / 180)); return 1 / Math.sin(Math.atan(k)) - 1; };
 
-  // --- "You are here" marker (HTML overlay outside the blended stage)
-  const markers = [];
-  function addMarker(el, lat, lng) { markers.push({ el, lat, lng }); document.body.append(el); }
-  function clearMarkers() { markers.splice(0).forEach((m) => m.el.remove()); g.ringsData([]); }
-
-  // --- controls
-  const controls = g.controls();
-  controls.enableZoom = false; // wheel is handled by Explore (M23)
-  controls.autoRotate = true;
-  const BASE_SPEED = (5 / 12) * 2; // OrbitControls: 2.0 ≈ 12°/s at 60 fps → 5°/s
-  controls.autoRotateSpeed = reducedMotion ? BASE_SPEED * 0.2 : BASE_SPEED;
-  controls.rotateSpeed = 0.6;
-  controls.minDistance = R * 1.25;
-  controls.maxDistance = R * 5;
-  let resumeTimer = 0;
-  let autoAllowed = true;
-  const pauseRotation = () => { controls.autoRotate = false; clearTimeout(resumeTimer); resumeTimer = setTimeout(() => (controls.autoRotate = autoAllowed), 3000); };
-  container.addEventListener("pointermove", pauseRotation);
-  container.addEventListener("pointerdown", pauseRotation);
-
-  // --- frame loop for uniforms, rings and overlays
-  let t0 = performance.now();
-  const tmp = new THREE.Vector3();
-  const loop = () => {
-    requestAnimationFrame(loop);
-    const t = (performance.now() - t0) / 1000;
-    emberMat.uniforms.uTime.value = t;
-    const cam = g.camera();
-    ringGroup.quaternion.copy(cam.quaternion);
-    if (!reducedMotion) { ringA.rotation.z = t * 0.05; ringB.rotation.z = -t * 0.035; }
-    if (markers.length) {
+  function syncOverlay() {
+    const r = radiusPx();
+    const [cx, cy] = centerPx();
+    const sr = stage.getBoundingClientRect();
+    orbits.style.setProperty("--cx", `${cx - sr.left}px`);
+    orbits.style.setProperty("--cy", `${cy - sr.top}px`);
+    orbits.querySelector(".orb-a ellipse").setAttribute("rx", r * 1.52);
+    orbits.querySelector(".orb-a ellipse").setAttribute("ry", r * 1.52 * 0.3);
+    orbits.querySelector(".orb-b ellipse").setAttribute("rx", r * 1.74);
+    orbits.querySelector(".orb-b ellipse").setAttribute("ry", r * 1.74 * 0.24);
+    orbits.style.opacity = countryMode || map.getZoom() > 3.2 ? "0" : "";
+    for (const m of markers) {
+      const p = map.project([m.lng, m.lat]);
       const rect = container.getBoundingClientRect();
-      for (const m of markers) {
-        const c = g.getCoords(m.lat, m.lng, 0.01);
-        tmp.set(c.x, c.y, c.z);
-        const facing = tmp.clone().normalize().dot(cam.position.clone().normalize());
-        const s = g.getScreenCoords(m.lat, m.lng, 0.01);
-        m.el.style.transform = `translate(${rect.left + s.x}px, ${rect.top + s.y}px)`;
-        m.el.style.opacity = facing > 0.15 ? "1" : "0";
-      }
+      const c = map.getCenter();
+      const hidden = map.getZoom() < 5 && angularDist([c.lng, c.lat], [m.lng, m.lat]) > (80 * Math.PI) / 180;
+      m.el.style.transform = `translate(${rect.left + p.x}px, ${rect.top + p.y}px)`;
+      m.el.style.opacity = hidden ? "0" : "1";
+    }
+  }
+  map.on("render", syncOverlay);
+  addEventListener("resize", () => requestAnimationFrame(syncOverlay));
+
+  // ---------- "You are here" (HTML overlay outside the blended stage)
+  const markers = [];
+  function clearMarkers() { markers.splice(0).forEach((m) => m.el.remove()); }
+
+  // ---------- hover + click on countries (hexagons in the country view take precedence)
+  let hoverIso = null;
+  const hitLayers = () => ["land50", "land"].filter((id) => map.getLayer(id));
+  const setHover = (iso) => {
+    if (iso === hoverIso) return;
+    for (const src of ["countries", "americas"]) {
+      if (!map.getSource(src)) continue;
+      if (hoverIso) map.setFeatureState({ source: src, id: hoverIso }, { hover: false });
+      if (iso) map.setFeatureState({ source: src, id: iso }, { hover: true });
+    }
+    hoverIso = iso;
+  };
+  const overlayHit = (point) => (map.getLayer("hx-fill") ? map.queryRenderedFeatures(point, { layers: ["hx-fill", "pts"].filter((id) => map.getLayer(id)) }).length > 0 : false);
+  function countryAtPoint(point) {
+    const f = map.queryRenderedFeatures(point, { layers: hitLayers() })[0];
+    return f ? countryByIso(f.properties.iso2) : null;
+  }
+  map.on("mousemove", (e) => {
+    if (!stage.classList.contains("is-interactive")) return;
+    if (drawing || overlayHit(e.point)) { setHover(null); onCountryHover?.(null); return; }
+    const f = countryAtPoint(e.point);
+    const own = countryMode && f?.properties.iso2 === focusIso;
+    setHover(f && !own ? f.properties.iso2 : null);
+    container.style.cursor = f && !own ? "pointer" : "";
+    onCountryHover?.(f && !own ? f : null);
+  });
+  map.on("mouseout", () => { setHover(null); onCountryHover?.(null); });
+  map.on("click", (e) => {
+    if (drawing || overlayHit(e.point)) return;
+    const f = countryAtPoint(e.point);
+    if (!f) { onCountryHover?.(null); return; }
+    if (countryMode && f.properties.iso2 === focusIso) return;
+    onCountryClick?.(f);
+  });
+
+  // ---------- auto-rotation (5°/s, paused while the user interacts)
+  let autoAllowed = true, autoOn = true, resumeTimer = 0, interacting = false, last = performance.now();
+  const BASE = reducedMotion ? 1 : 5;
+  const pauseRotation = () => { autoOn = false; clearTimeout(resumeTimer); resumeTimer = setTimeout(() => (autoOn = autoAllowed), 3000); };
+  container.addEventListener("pointerdown", () => { interacting = true; pauseRotation(); });
+  addEventListener("pointerup", () => { interacting = false; });
+  container.addEventListener("wheel", pauseRotation, { passive: true });
+  container.addEventListener("pointermove", (e) => { if (e.buttons) pauseRotation(); });
+
+  // ---------- frame loop: rotation, ember flicker, arc dashes
+  const DASH = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]];
+  let dashI = 0, lastDash = 0, lastFlick = 0, paused = false;
+  const loop = (now) => {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    if (paused || document.hidden || !loaded) return;
+    if (autoOn && autoAllowed && !interacting && !countryMode && !map.isMoving()) {
+      const c = map.getCenter();
+      map.jumpTo({ center: [c.lng + BASE * dt, c.lat] });
+    }
+    if (!reducedMotion && !countryMode) {
+      if (now - lastDash > 70) { lastDash = now; dashI = (dashI + 1) % DASH.length; map.setPaintProperty("arcs", "line-dasharray", DASH[dashI]); }
+      if (now - lastFlick > 140) { lastFlick = now; const k = 0.5 + 0.12 * Math.sin(now / 420) + 0.06 * Math.sin(now / 157); map.setPaintProperty("hot-glow", "circle-opacity", ["case", ["get", "active"], state.theme === "day" ? k * 0.65 : k, 0.25]); }
     }
   };
-  loop();
+  requestAnimationFrame(loop);
+  document.addEventListener("visibilitychange", () => { last = performance.now(); });
 
-  // --- theme
-  const applyTheme = () => {
-    const day = state.theme === "day";
-    g.globeMaterial(day ? dayMat : nightMat);
-    g.atmosphereColor(day ? "#F48C06" : "#FF6A1A").atmosphereAltitude(day ? 0.14 : 0.2);
-    g.polygonCapColor(capColor).polygonStrokeColor(strokeColor);
-    emberMat.uniforms.uDay.value = day ? 1 : 0;
-    emberMat.blending = day ? THREE.NormalBlending : THREE.AdditiveBlending;
-    emberMat.needsUpdate = true;
-    if (bloom) bloom.enabled = !day;
-    g.backgroundColor(day ? "rgba(0,0,0,0)" : "#000000");
-    ringA.material.color.set(day ? 0xb4501c : 0xff8a2a);
-    ringB.material.color.set(day ? 0xb4501c : 0xff9a3c);
-    stage.classList.toggle("is-day", day);
-    if (g.arcsData().length) g.arcColor(g.arcColor());
-  };
-  on("theme", applyTheme);
-  applyTheme();
+  // ---------- interaction switches
+  const handlers = ["dragPan", "scrollZoom", "doubleClickZoom", "touchZoomRotate", "keyboard"];
+  function setInteractive(on) {
+    stage.classList.toggle("is-interactive", on);
+    for (const h of handlers) on ? map[h].enable() : map[h].disable();
+    if (on) map.touchZoomRotate.disableRotation();
+    if (!on) { setHover(null); onCountryHover?.(null); }
+  }
+  setInteractive(false);
 
-  // --- size
-  const resize = () => { g.width(innerWidth).height(innerHeight); bloom?.setSize(innerWidth, innerHeight); };
-  addEventListener("resize", resize);
-  resize();
-
-  // --- visibility (§10: pause when hidden)
-  let paused = false;
-  document.addEventListener("visibilitychange", () => { if (document.hidden) g.pauseAnimation(); else if (!paused) g.resumeAnimation(); });
+  // ---------- country mode (same map: the globe flies down and flattens)
+  let focusIso = "";
+  function setFocus(iso) {
+    focusIso = iso ?? "";
+    whenReady(() => {
+      for (const id of ["focus-glow", "focus-line"]) map.setFilter(id, ["==", ["get", "iso2"], focusIso]);
+    });
+  }
+  function enterCountry(bbox, { padding, duration = 1600 } = {}) {
+    countryMode = true;
+    layout = "country";
+    stage.dataset.layout = "country";
+    stage.style.setProperty("--gx", "0px");
+    stage.style.setProperty("--gy", "0px");
+    autoAllowed = false; autoOn = false;
+    applyTheme();
+    setInteractive(true);
+    return new Promise((resolve) => whenReady(() => {
+      map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding, duration: reducedMotion ? 0 : duration, maxZoom: 9, essential: true });
+      map.once("moveend", resolve);
+      if (reducedMotion) setTimeout(resolve, 50);
+    }));
+  }
+  function exitCountry() {
+    countryMode = false;
+    setFocus("");
+    autoAllowed = true;
+    applyTheme();
+  }
 
   let layout = "hero";
   const api = {
-    g,
+    map,
+    get canvas() { return map.getCanvas(); },
     get layout() { return layout; },
+    get countryMode() { return countryMode; },
+    ready,
     setHotspots,
     setArcs,
-    pov: (lat, lng, alt, ms = 1400) => g.pointOfView({ lat, lng, altitude: alt ?? g.pointOfView().altitude }, reducedMotion ? 0 : ms),
-    getPov: () => g.pointOfView(),
+    radiusPx,
+    centerPx,
+    pov(lat, lng, alt, ms = 1400) {
+      whenReady(() => {
+        const zoom = alt != null ? zoomForAlt(alt, lat) : map.getZoom();
+        map.easeTo({ center: [lng, lat], zoom, duration: reducedMotion ? 0 : ms, essential: true });
+      });
+    },
+    getPov() { const c = map.getCenter(); return { lat: c.lat, lng: c.lng, altitude: altForZoom() }; },
     rotateBy(dLng, dLat = 0) {
-      const p = g.pointOfView();
-      g.pointOfView({ lat: Math.max(-70, Math.min(70, p.lat + dLat)), lng: p.lng + dLng, altitude: p.altitude }, 0);
+      const c = map.getCenter();
+      map.jumpTo({ center: [c.lng + dLng, Math.max(-70, Math.min(70, c.lat + dLat))] });
       pauseRotation();
     },
-    zoomBy(f) { const p = g.pointOfView(); g.pointOfView({ ...p, altitude: Math.max(0.6, Math.min(4, p.altitude * f)) }, reducedMotion ? 0 : 500); },
+    zoomBy(f) { map.easeTo({ zoom: map.getZoom() - Math.log2(f) * 1.6, duration: reducedMotion ? 0 : 450 }); pauseRotation(); },
     setLayout(name, { ms = 1100, keepPov = false } = {}) {
+      if (countryMode && name !== "country") exitCountry();
       layout = name;
       const L = layoutFor(name);
       stage.dataset.layout = name;
       stage.style.setProperty("--gx", `${L.x * 100}vw`);
       stage.style.setProperty("--gy", `${L.y * 100}vh`);
-      if (!keepPov) { const p = g.pointOfView(); g.pointOfView({ lat: p.lat, lng: p.lng, altitude: L.alt }, reducedMotion ? 0 : ms); }
+      if (!keepPov) whenReady(() => map.easeTo({ zoom: zoomForAlt(L.alt), duration: reducedMotion ? 0 : ms, essential: true }));
     },
-    setInteractive(on) { stage.classList.toggle("is-interactive", on); },
-    setAutoRotate(on) { autoAllowed = on; controls.autoRotate = on; },
+    setInteractive,
+    setAutoRotate(on) { autoAllowed = on; autoOn = on; },
     youAreHere(lat, lng, label) {
       clearMarkers();
-      g.ringsData([{ lat, lng }]).ringColor(() => (t) => `rgba(124,198,255,${1 - t})`).ringMaxRadius(4.5).ringPropagationSpeed(2.2).ringRepeatPeriod(reducedMotion ? 0 : 1100).ringAltitude(0.012);
       const el = document.createElement("div");
       el.className = "you-are-here";
-      el.innerHTML = `<span class="yah-dot" aria-hidden="true"></span><span class="yah-label"></span>`;
+      el.innerHTML = `<span class="yah-dot" aria-hidden="true"><i></i><i></i></span><span class="yah-label"></span>`;
       el.querySelector(".yah-label").textContent = label;
       el.style.setProperty("--viirs", VIIRS_BLUE);
-      addMarker(el, lat, lng);
+      document.body.append(el);
+      markers.push({ el, lat, lng });
+      pauseRotation();
+      syncOverlay();
     },
     clearMarkers,
-    pause() { paused = true; g.pauseAnimation(); },
-    resume() { paused = false; g.resumeAnimation(); },
+    enterCountry,
+    exitCountry,
+    setFocus,
+    setDrawing(on) { drawing = on; },
+    pause() { paused = true; },
+    resume() { paused = false; },
   };
+  let drawing = false;
+  whenReady(applyTheme);
   return api;
 }

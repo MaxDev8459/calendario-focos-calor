@@ -140,7 +140,7 @@ export const T = {
 
   explore: {
     title: "Explore the Americas",
-    hint: "Wheel rotates · Drag to spin · Click a country",
+    hint: "Drag to spin · Scroll to zoom · Click a country",
     release: "Esc releases the scroll",
     continue: "Continue",
     zoomIn: "Zoom in",
@@ -155,6 +155,18 @@ export const T = {
     sampleNote: "Globe hotspots are sample data until the aggregated endpoint is connected.",
   },
 
+  picker: {
+    kicker: "Open a country",
+    title: "Where do you want to look?",
+    placeholder: "Search a country in the Americas…",
+    placeholderShort: "Search a country…",
+    switchLabel: "Switch to another country",
+    switchPlaceholder: "Switch country…",
+    showAll: "Show all countries",
+    none: "No active country matches. Only the Americas are live for now.",
+    top: "Most active",
+  },
+
   comingSoon: {
     tag: "Coming soon",
     body: (continent) => `The Americas are live in this demo. ${continent} is next in orbit.`,
@@ -162,6 +174,7 @@ export const T = {
   },
 
   country: {
+    tabs: { label: "Jump to a card", cell: "Cell", calendar: "Calendar", anomaly: "Anomaly", controls: "Area & period", summary: "Summary" },
     breadcrumbLabel: "Location",
     planet: "Planet",
     americas: "Americas",
@@ -173,6 +186,9 @@ export const T = {
     mapLabel: (country) => `Hexagon map of harmonized hotspots in ${country}. Select a hexagon to see its values.`,
     loading: "Loading hotspots…",
     perHex: "per hexagon",
+    perHexPoints: (month) => `Detections per hexagon · ${month}`,
+    hexDetections: (n) => `${n} detection${n === "1" ? "" : "s"} in this hexagon`,
+    detailHint: "Zoomed in: individual detections for the selected month",
     hexTooltip: (n) => `${n} hotspots`,
     scopeCountry: (c) => `Scope: ${c}`,
     scopeArea: "Scope: drawn area",
@@ -333,6 +349,7 @@ export const T = {
       ["NASA FIRMS — MODIS Collection 6.1 (Aqua)", "Standard processing archive, July 2002 – January 2012 and the overlap years used to calibrate.", "https://firms.modaps.eosdis.nasa.gov/"],
       ["NASA FIRMS — VIIRS 375 m (S-NPP)", "Standard processing from February 2012; near real time after the last complete month.", "https://firms.modaps.eosdis.nasa.gov/"],
       ["Natural Earth — admin-0 countries", "Country borders, public domain.", "https://www.naturalearthdata.com/"],
+      ["OpenStreetMap via OpenFreeMap", "Place names, rivers and roads on the live map. © OpenStreetMap contributors (ODbL), OpenMapTiles.", "https://www.openstreetmap.org/copyright"],
     ],
     filtersTitle: "Filters applied",
     filters: ["Type 0 only (vegetation fires): volcanoes, static sources and offshore detections removed, plus persistent heat sources such as refineries and gas flares.", "Low-confidence detections removed (MODIS < 30, VIIRS low). Only Aqua (MODIS) and S-NPP (VIIRS), which pass at about 13:30.", "Monthly counts grouped by UTC acquisition date, as in FIRMS.", "0 means observed with no hotspots; an empty cell means no data."],
@@ -354,7 +371,7 @@ export const T = {
     aiTitle: "Use of AI",
     ai: "Parts of this website’s code were written with an AI coding assistant and reviewed by the team. No AI-generated images, video or audio are used; the globe, waves and charts are drawn in code from the data. Any AI-generated media added later will carry a visible “AI-generated” watermark.",
     licensesTitle: "Libraries & licenses",
-    licenses: "globe.gl and Three.js (MIT), h3-js (Apache 2.0), Leaflet and Leaflet.draw (BSD-2 / MIT), GSAP (Standard no-charge license), Lenis (MIT), d3 (ISC), Instrument Serif, Inter and JetBrains Mono (SIL Open Font License). Full list in the README.",
+    licenses: "MapLibre GL JS (BSD-3-Clause), h3-js (Apache 2.0), GSAP (Standard no-charge license), Lenis (MIT), d3 (ISC), Instrument Serif, Inter and JetBrains Mono (SIL Open Font License). Full list in the README.",
   },
 
   about: {

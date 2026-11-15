@@ -40,21 +40,52 @@ export function validateDayRange(from, to) {
   return { from, to };
 }
 
-// Rectangle drawing on the Leaflet map (Leaflet.draw, rectangle only)
-export function startDraw(L, map, { onDone, onCancel }) {
-  const handler = new L.Draw.Rectangle(map, {
-    showArea: false, // avoids a known Leaflet.draw + Leaflet 1.9 tooltip bug
-    shapeOptions: { className: "map-area drawing", weight: 1.6, fillOpacity: 0.08, color: "#FFBA08" },
-  });
-  const created = (e) => {
-    const b = e.layer.getBounds();
-    finish();
-    onDone(validateBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]));
+// Rectangle drawing on the live map: press, drag, release (mouse, pen or touch). Esc cancels.
+export function startDraw(globe, { onDone, onCancel }) {
+  const map = globe.map;
+  const canvas = map.getCanvasContainer();
+  const EMPTY = { type: "FeatureCollection", features: [] };
+  if (!map.getSource("draft")) {
+    map.addSource("draft", { type: "geojson", data: EMPTY });
+    map.addLayer({ id: "draft-fill", type: "fill", source: "draft", paint: { "fill-color": "#ffba08", "fill-opacity": 0.1 } });
+    map.addLayer({ id: "draft-line", type: "line", source: "draft", paint: { "line-color": "#ffba08", "line-width": 1.8, "line-dasharray": [2, 2] } });
+  }
+  const box = (a, b) => [Math.min(a.lng, b.lng), Math.min(a.lat, b.lat), Math.max(a.lng, b.lng), Math.max(a.lat, b.lat)];
+  const show = (bb) => map.getSource("draft").setData(bb ? { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[[bb[0], bb[1]], [bb[2], bb[1]], [bb[2], bb[3]], [bb[0], bb[3]], [bb[0], bb[1]]]] } } : EMPTY);
+  let start = null;
+  const at = (e) => { const r = canvas.getBoundingClientRect(); return map.unproject([e.clientX - r.left, e.clientY - r.top]); };
+  const down = (e) => {
+    if (e.button > 0) return;
+    e.preventDefault(); e.stopPropagation();
+    start = at(e);
+    canvas.setPointerCapture?.(e.pointerId);
   };
-  const stopped = () => { finish(); onCancel?.(); };
-  function finish() { map.off(L.Draw.Event.CREATED, created); map.off(L.Draw.Event.DRAWSTOP, stopped); }
-  map.on(L.Draw.Event.CREATED, created);
-  map.once(L.Draw.Event.DRAWSTOP, stopped);
-  handler.enable();
-  return () => handler.disable();
+  const move = (e) => { if (start) show(box(start, at(e))); };
+  const up = (e) => {
+    if (!start) return;
+    const bb = box(start, at(e));
+    start = null;
+    finish();
+    if (bb[2] - bb[0] < 0.02 || bb[3] - bb[1] < 0.02) { onCancel?.(); return; }
+    onDone(validateBbox(bb));
+  };
+  function finish() {
+    canvas.removeEventListener("pointerdown", down, true);
+    canvas.removeEventListener("pointermove", move);
+    canvas.removeEventListener("pointerup", up);
+    canvas.classList.remove("is-drawing");
+    map.dragPan.enable();
+    map.touchZoomRotate.enable();
+    map.touchZoomRotate.disableRotation();
+    globe.setDrawing(false);
+    show(null);
+  }
+  map.dragPan.disable();
+  map.touchZoomRotate.disable();
+  globe.setDrawing(true);
+  canvas.classList.add("is-drawing");
+  canvas.addEventListener("pointerdown", down, true);
+  canvas.addEventListener("pointermove", move);
+  canvas.addEventListener("pointerup", up);
+  return () => { finish(); onCancel?.(); };
 }

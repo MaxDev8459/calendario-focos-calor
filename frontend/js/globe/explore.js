@@ -4,16 +4,11 @@
 import { T, REGION_NAMES } from "../i18n/en.js";
 import { icons } from "../ui/icons.js";
 import { legendHTML } from "../ui/legend.js";
-import { allCountries } from "../util/geo.js";
+import { countryPicker } from "../ui/countrypicker.js";
 import { fmtInt } from "../util/format.js";
 import { reducedMotion } from "../state.js";
 
 export function renderExplore(el) {
-  const options = allCountries()
-    .filter((f) => f.properties.active)
-    .sort((a, b) => a.properties.name.localeCompare(b.properties.name))
-    .map((f) => `<option value="${f.properties.iso2}">${f.properties.name}</option>`)
-    .join("");
   el.innerHTML = `
     <div class="explore-ui">
       <h2 id="explore-title" class="explore-title serif">${T.explore.title.replace("Americas", "<em>Americas</em>")}</h2>
@@ -22,10 +17,7 @@ export function renderExplore(el) {
         <button type="button" class="round-btn" data-zoom="in" aria-label="${T.explore.zoomIn}">${icons.plus}</button>
         <button type="button" class="round-btn" data-zoom="out" aria-label="${T.explore.zoomOut}">${icons.minus}</button>
       </div>
-      <label class="country-pick">
-        <span class="label">${T.explore.countryList}</span>
-        <span class="select-wrap pill">${icons.globe}<select data-country-pick><option value="">${T.explore.countryListPlaceholder}</option>${options}</select>${icons.chevron}</span>
-      </label>
+      <div class="country-pick" data-picker></div>
       <p class="explore-hint pill"><span>${T.explore.hint}</span><span class="hint-sep" aria-hidden="true">·</span><span>${T.explore.release}</span></p>
       <button type="button" class="btn btn-ghost continue" data-continue>${T.explore.continue}${icons.arrowDown}</button>
     </div>`;
@@ -35,8 +27,11 @@ export function initExplore(el, { globe, lenis, openCountry, totals }) {
   let locked = false;
   const tip = document.getElementById("globe-tip");
 
+  // While locked the page does not scroll: over the globe the wheel zooms (MapLibre), elsewhere it spins it.
   const onWheel = (e) => {
-    if (!locked) return;
+    if (!locked || document.body.classList.contains("in-country")) return;
+    if (e.target.closest?.(".cpick-list")) return;
+    if (e.target.closest?.("#globe")) return; // the map zooms and prevents the page scroll itself
     e.preventDefault();
     const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
     globe.rotateBy(d * (reducedMotion ? 0.05 : 0.12));
@@ -72,7 +67,7 @@ export function initExplore(el, { globe, lenis, openCountry, totals }) {
   });
   el.querySelector("[data-continue]").addEventListener("click", () => unlock(true));
   el.querySelectorAll("[data-zoom]").forEach((b) => b.addEventListener("click", () => globe.zoomBy(b.dataset.zoom === "in" ? 0.8 : 1.25)));
-  el.querySelector("[data-country-pick]").addEventListener("change", (e) => { if (e.target.value) openCountry(e.target.value); e.target.value = ""; });
+  const picker = countryPicker(el.querySelector("[data-picker]"), { totals, onPick: openCountry });
 
   // hover tooltip (HTML, translatable)
   let mouse = { x: 0, y: 0 };
@@ -82,6 +77,7 @@ export function initExplore(el, { globe, lenis, openCountry, totals }) {
   });
   return {
     lock, unlock,
+    refreshPicker: () => picker.refresh(),
     get locked() { return locked; },
     hover(feature) {
       if (!feature || !document.getElementById("globe-stage").classList.contains("is-interactive")) { tip.hidden = true; return; }

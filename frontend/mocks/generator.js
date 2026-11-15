@@ -158,7 +158,8 @@ export function focosCsv(args) {
 export function celdas({ bbox, desde, hasta, step }) {
   const [w, s, e, n] = bbox;
   const area = (e - w) * (n - s);
-  const res = step ?? (area > 900 ? 0.5 : area > 200 ? 0.25 : area > 20 ? 0.1 : 0.05);
+  // 0.1° tiles like the contract (coarser only for continent-sized boxes, to stay fast)
+  const res = step ?? (area > 2500 ? 0.25 : area > 1600 ? 0.2 : 0.1);
   const months = [...monthsBetween(desde, hasta)].filter(([y, m]) => isAvailable(y, m));
   // Collapse the month range into a per-cluster weight to keep it fast
   const weights = CLUSTERS.map((c) => months.reduce((acc, [y, m]) => acc + season(c, m) * yearFactor(c, y, m), 0));
@@ -179,7 +180,11 @@ export function celdas({ bbox, desde, hasta, step }) {
       // texture: patchy fire-prone cells and quiet cells
       const h = hash(Math.round(lat * 20), Math.round(lon * 20));
       const tex = 0.25 + 1.6 * Math.pow(h, 1.6) + (h > 0.965 ? 2.2 : 0);
-      v = v * cellKm2 * tex + months.length * 0.002 * cellKm2 * hash(lat, lon, 7);
+      v = v * cellKm2 * tex;
+      // real tiles exist only where something burned: keep a tile with probability 1 − e^(−v/k)
+      const p = 1 - Math.exp(-v / (2 + months.length * 0.15));
+      if (p < 0.02 || hash(lat * 7.3, lon * 3.1, 11) > p) continue;
+      v = v / Math.max(p, 0.05);
       out.push({ ty: Math.floor(lat / 0.1), tx: Math.floor(lon / 0.1), lat_c: Math.round(lat * 1e5) / 1e5, lon_c: Math.round(lon * 1e5) / 1e5, conteo: Math.round(v * 10) / 10 });
     }
   }

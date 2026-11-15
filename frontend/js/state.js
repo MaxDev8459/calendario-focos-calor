@@ -26,6 +26,7 @@ export function set(key, value) {
 export function on(key, fn) {
   if (!listeners.has(key)) listeners.set(key, []);
   listeners.get(key).push(fn);
+  return () => { const a = listeners.get(key); const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1); };
 }
 
 // simple pub/sub for app events

@@ -4,12 +4,14 @@
 import { T, REGION_NAMES, LABELS } from "../i18n/en.js";
 import { RAMP, FIRST_MONTH, LAST_MONTH_FALLBACK, VIIRS_START_YEAR } from "../config.js";
 import { icons } from "../ui/icons.js";
-import { countryByIso, geoCentroid } from "../util/geo.js";
+import { countryByIso } from "../util/geo.js";
+import { geoContains } from "../../vendor/geo.js";
 import { getCells, getCalendar, getAnomaly, getLast7, getHotspots, downloadCsv } from "../api/client.js";
 import { fmtInt, fmtNum, fmtPct, fmtLat, fmtLon, fmtDateTime, fmtAcq, monthName, fmtMonthKey } from "../util/format.js";
 import { state, on, reducedMotion, emit } from "../state.js";
 import { toast } from "../ui/toast.js";
-import { loadLeaflet, createMap, computeHexes, pickResolution, hexInfo, hexAt, cellId, parseCellId, hexTooltip } from "./hexmesh.js";
+import { createHexLayer, hexInfo, hexAt, cellId, parseCellId, hexTooltip } from "./hexmesh.js";
+import { countryPicker } from "../ui/countrypicker.js";
 import { renderCalendar, calendarHeader } from "./calendar.js";
 import { renderAnomaly, completeAnomaly } from "./anomaly.js";
 import { validateBbox, pointToBbox, validateMonthRange, validateDayRange, startDraw } from "./draw.js";
@@ -21,10 +23,9 @@ const loadAmericas = () => (americasPromise ??= fetch("./data/americas-50m.json"
 
 const lastDay = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
 
-export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }) {
+export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, openCountry, totals }) {
   let s = null; // view state
-  let map = null;
-  let L = null;
+  let map = null; // hexagon mesh on the shared live map
   let token = 0;
   let cancelDraw = null;
   let calData = null;
@@ -58,7 +59,6 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
   function shell() {
     const c = T.country;
     el.innerHTML = `
-      <div class="cv-map" data-map role="region" aria-label="${c.mapLabel(s.name)}"></div>
       <svg class="cv-callouts" aria-hidden="true"></svg>
       <div class="cv-head">
         <nav class="crumbs mono" aria-label="${c.breadcrumbLabel}">
@@ -66,8 +66,10 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
           <button type="button" data-crumb="americas">${c.americas}</button><span aria-hidden="true">→</span>
           <span aria-current="page">${s.name}</span>
         </nav>
-        <h2 class="cv-title serif" id="cv-title">${s.name} <em>· ${REGION_NAMES.americas}</em></h2>
+        <h2 class="cv-title serif" id="cv-title" tabindex="-1">${s.name} <em>· ${REGION_NAMES.americas}</em></h2>
+        <div class="cv-switch" data-switch></div>
         <p class="cv-loading mono" data-loading>${c.loading}</p>
+        <p class="sr-only">${c.mapLabel(s.name)}</p>
       </div>
       <div class="cv-tools">
         <button type="button" class="btn btn-ghost btn-sm" data-back>${icons.arrowLeft}<span>${c.back}</span></button>
@@ -80,6 +82,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
       <div class="hex-tip" role="tooltip" hidden></div>
       <aside class="cv-cards" aria-labelledby="cv-title" data-cards>
         <button type="button" class="sheet-handle" data-sheet aria-expanded="false"><span aria-hidden="true"></span><span class="sr-only">${T.country.sheet}</span></button>
+        <nav class="card-tabs" aria-label="${c.tabs.label}">${["cell", "calendar", "anomaly", "controls", "summary"].map((k) => `<button type="button" data-tab="${k}">${c.tabs[k]}</button>`).join("")}</nav>
         <section class="card" data-card="cell" aria-live="polite"></section>
         <section class="card" data-card="calendar"></section>
         <section class="card" data-card="anomaly" aria-live="polite"></section>
@@ -95,13 +98,27 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
     el.querySelector("[data-back]").addEventListener("click", () => onClose("explore"));
     el.querySelector('[data-crumb="planet"]').addEventListener("click", () => onClose("hero"));
     el.querySelector('[data-crumb="americas"]').addEventListener("click", () => onClose("explore"));
-    el.querySelectorAll("[data-mz]").forEach((b) => b.addEventListener("click", () => (b.dataset.mz === "in" ? map.map.zoomIn() : map.map.zoomOut())));
+    el.querySelectorAll("[data-mz]").forEach((b) => b.addEventListener("click", () => (b.dataset.mz === "in" ? globe.map.zoomIn() : globe.map.zoomOut())));
+    countryPicker(el.querySelector("[data-switch]"), { compact: true, current: s.iso, totals, onPick: (iso) => openCountry(iso) });
     el.querySelector("[data-sheet]").addEventListener("click", (e) => {
       const open = el.querySelector("[data-cards]").classList.toggle("is-open");
       e.currentTarget.setAttribute("aria-expanded", String(open));
     });
     el.querySelector("[data-cal-close]").addEventListener("click", () => el.querySelector("[data-cal-dialog]").close());
-    el.querySelector("[data-cards]").addEventListener("scroll", drawCallouts, { passive: true });
+    const cardsBox = el.querySelector("[data-cards]");
+    cardsBox.addEventListener("scroll", () => { drawCallouts(); syncTabs(); }, { passive: true });
+    el.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
+      const card = el.querySelector(`[data-card="${b.dataset.tab}"]`);
+      cardsBox.scrollTo({ top: card.offsetTop - cardsBox.querySelector(".card-tabs").offsetHeight - 8, behavior: reducedMotion ? "auto" : "smooth" });
+      card.querySelector("button, input, [tabindex]")?.focus({ preventScroll: true });
+    }));
+    function syncTabs() {
+      const top = cardsBox.scrollTop + cardsBox.querySelector(".card-tabs").offsetHeight + 24;
+      let cur = "cell";
+      for (const k of ["cell", "calendar", "anomaly", "controls", "summary"]) if (el.querySelector(`[data-card="${k}"]`).offsetTop <= top) cur = k;
+      el.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.tab === cur)));
+    }
+    syncTabs();
   }
 
   // ---------- cards
@@ -113,7 +130,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
       return;
     }
     const info = hexInfo(s.cell);
-    const total = s.hexCounts.get(s.cell) ?? 0;
+    const total = s.cellTotal ?? 0;
     const [fy] = s.from.split("-").map(Number);
     const [ty] = s.to.split("-").map(Number);
     const src = ty < VIIRS_START_YEAR ? LABELS.MODIS_ajustado : fy >= VIIRS_START_YEAR ? LABELS.VIIRS : c.sourceMixed;
@@ -247,7 +264,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
       drawBtn.setAttribute("aria-pressed", "true");
       drawBtn.querySelector("span").textContent = c.drawing;
       el.classList.add("is-drawing");
-      cancelDraw = startDraw(L, map.map, {
+      cancelDraw = startDraw(globe, {
         onDone: (v) => { endDraw(); if (v.error) bboxErr.textContent = v.error; else setArea(v.bbox, "drawn"); },
         onCancel: endDraw,
       });
@@ -283,7 +300,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
     const when = p.hora_utc ? fmtAcq(p.fecha, p.hora_utc) : T.country.points.utcDate(p.fecha);
     return T.country.points.tooltip(when, p.sensor, conf, fmtNum(p.frp_mw), LABELS.dia_noche[p.dia_noche] ?? "");
   };
-  on("tz", () => { if (lastPoints && map) map.setPoints(lastPoints, pointTip); if (s) renderSummary(); });
+  on("tz", () => { if (lastPoints && map) map.setPoints(lastPoints, pointTip); if (s && !el.hidden) renderSummary(); });
 
   function syncBboxInputs() {
     const f = el.querySelector("[data-bbox]")?.elements;
@@ -347,7 +364,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
     if (!svg) return;
     if (!s?.cell || innerWidth < 900) { svg.innerHTML = ""; return; }
     const p = map.hexCenterPoint(s.cell);
-    const mapRect = el.querySelector("[data-map]").getBoundingClientRect();
+    const mapRect = globe.map.getContainer().getBoundingClientRect();
     const x0 = mapRect.left + p.x, y0 = mapRect.top + p.y;
     const cards = ["cell", "calendar", "anomaly", "controls"].map((k) => el.querySelector(`[data-card="${k}"]`).getBoundingClientRect());
     // only the part of each card that is visible inside the scrolling card column
@@ -367,6 +384,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
   // ---------- actions
   function pickMonth(y, m) {
     s.focus = { y, m };
+    map?.reloadPoints();
     syncHash();
     renderCalendarCard();
     loadAnomaly(token);
@@ -375,8 +393,8 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
 
   function selectCell(h) {
     s.cell = h;
-    if (h) { const i = hexInfo(h); s.cellLabel = cellId(s.iso, i.lat, i.lon); }
-    else s.cellLabel = null;
+    if (h) { const i = hexInfo(h); s.cellLabel = cellId(s.iso, i.lat, i.lon); s.cellTotal = map.countOf(h) ?? 0; }
+    else { s.cellLabel = null; s.cellTotal = null; }
     map.select(h);
     renderCell();
     syncHash();
@@ -389,7 +407,7 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
     s.cell = null; s.cellLabel = null;
     map.select(null);
     map.setArea(type === "country" ? null : bbox);
-    if (type === "country") map.fitCountry(); else map.fitBbox(bbox);
+    map.fitBbox(type === "country" ? s.countryBbox : bbox);
     syncBboxInputs();
     renderCell();
     syncHash();
@@ -421,11 +439,9 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
       jobs.push(getCells(s.countryBbox, s.from, s.to).then((cells) => {
         if (tk !== token) return;
         onSample(cells.sample);
-        const { hexes: hx, counts } = computeHexes(s.geometry, s.res, cells);
-        s.hexCounts = counts;
-        const { cuts } = map.setHexes(hx, counts, { animate: !s.hexesShown });
-        s.hexesShown = true;
-        el.querySelector("[data-legend]").innerHTML = `${stepLegendHTML(cuts, RAMP, { label: T.country.perHex })}`;
+        // keep only the tiles inside the country (the bbox also covers neighbours)
+        const inside = cells.celdas.filter((c) => c.conteo > 0 && geoContains(s.feature, [c.lon_c, c.lat_c]));
+        map.setCells(inside);
       }));
     }
     try { await Promise.all(jobs); } catch (e) { toast(e.message); }
@@ -445,10 +461,11 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
   }
 
   // ---------- open / close
+  const onMapMove = () => drawCallouts();
+  const detailMonth = () => (s.focus ? `${s.focus.y}-${String(s.focus.m).padStart(2, "0")}` : s.to);
   async function open(params) {
     const f110 = countryByIso(params.iso);
     if (!f110) return false;
-    const first = !s || s.iso !== params.iso;
     const meta = getMeta();
     s = {
       iso: params.iso,
@@ -459,58 +476,62 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
       from: params.from ?? FIRST_MONTH,
       to: params.to ?? meta?.ultimo_mes_completo ?? LAST_MONTH_FALLBACK,
       focus: params.month ? { y: +params.month.slice(0, 4), m: +params.month.slice(5, 7) } : null,
-      cell: null, cellLabel: null, hexCounts: new Map(), hexesShown: false, last7: null,
+      cell: null, cellLabel: null, cellTotal: null, last7: null,
     };
     s.dayFrom = `${s.from}-01`;
     s.dayTo = lastDay(s.to);
     if (params.bbox) { const v = validateBbox(params.bbox); if (!v.error) { s.area = v.bbox; s.areaType = "drawn"; } }
+    calData = null; anomaly = null; lastPoints = null;
+    cancelDraw?.();
 
-    // fly-to (§4.4: 1.4 s ease-in-out), then globe → flat map crossfade
     document.body.classList.add("in-country");
-    const [clon, clat] = geoCentroid(f110);
-    globe.setInteractive(false);
-    globe.setAutoRotate(false);
-    globe.pov(clat, clon, 0.75, reducedMotion ? 0 : 1400);
-    waves.setOpacity(0.12);
     emit("section", "country");
-
-    const [Lmod, americas] = await Promise.all([loadLeaflet(), loadAmericas()]);
-    L = Lmod;
-    const f50 = americas.features.find((f) => f.properties.iso2 === s.iso) ?? f110;
-    s.geometry = f50.geometry;
-    const areaKm2 = f110.properties.area * 6371 * 6371;
-    s.res = pickResolution(areaKm2);
+    waves.setOpacity(0.12);
+    const americas = await loadAmericas();
+    s.feature = americas.features.find((f) => f.properties.iso2 === s.iso) ?? f110;
 
     if (map) { map.destroy(); map = null; }
     shell();
     el.hidden = false;
-    await new Promise((r) => setTimeout(r, reducedMotion ? 0 : Math.max(0, 1150)));
-    el.classList.add("is-open");
-    document.getElementById("globe-stage").classList.add("is-away");
-    map = createMap(el.querySelector("[data-map]"), {
-      americas, country: f50,
+    // the same live map flies from the globe down to the country (§4.4)
+    await globe.ready;
+    map = createHexLayer(globe, {
       onSelect: (h) => selectCell(h === s.cell ? null : h),
       onHover: (d) => {
         const tip = el.querySelector(".hex-tip");
+        if (!tip) return;
         if (!d) { tip.hidden = true; return; }
-        tip.textContent = hexTooltip(s.hexCounts.get(d.h) ?? 0);
+        tip.textContent = d.text ?? (d.mode === "points" ? T.country.hexDetections(fmtInt(d.v ?? 0)) : hexTooltip(d.v ?? 0));
         tip.hidden = false;
-        const r = el.getBoundingClientRect();
-        tip.style.transform = `translate(${d.e.originalEvent.clientX - r.left + 14}px, ${d.e.originalEvent.clientY - r.top + 12}px)`;
+        tip.style.transform = `translate(${d.x + 14}px, ${d.y + 12}px)`;
       },
+      onRes: ({ cuts, mode }) => {
+        const lg = el.querySelector("[data-legend]");
+        if (lg) lg.innerHTML = stepLegendHTML(cuts, RAMP, { label: mode === "points" ? T.country.perHexPoints(fmtMonthKey(detailMonth())) : T.country.perHex });
+      },
+      // zoomed in: the individual detections (B4) for the selected month, binned into small hexagons
+      loadPoints: async (bbox) => {
+        const ym = detailMonth();
+        const fc = await getHotspots(bbox, `${ym}-01`, lastDay(ym));
+        onSample(fc.sample);
+        return fc.features ?? [];
+      },
+      clipBbox: () => (s.areaType === "country" ? s.countryBbox : s.area),
     });
-    map.fitCountry();
-    map.map.on("move zoom", drawCallouts);
+    globe.setFocus(s.iso);
+    const fly = globe.enterCountry(s.areaType === "country" ? s.countryBbox : s.area, { padding: map.insets(), duration: 1700 });
+    requestAnimationFrame(() => el.classList.add("is-open"));
+    globe.map.on("move", onMapMove);
     addEventListener("resize", drawCallouts);
-    if (s.areaType !== "country") { map.setArea(s.area); map.fitBbox(s.area); syncBboxInputs(); }
+    if (s.areaType !== "country") { map.setArea(s.area); syncBboxInputs(); }
     renderCell();
     renderCalendarCard();
     renderAnomalyCard();
-    await loadAll({ hexes: true });
+    await Promise.all([fly, loadAll({ hexes: true })]);
     // restore a cell from the link (e.g. cell=MX-18.9-099.2)
     const pc = parseCellId(params.cell);
-    if (pc) { const h = hexAt(pc.lat, pc.lon, s.res); if (s.hexCounts.has(h) || true) selectCell(h); }
-    el.querySelector("#cv-title")?.focus?.();
+    if (pc) selectCell(hexAt(pc.lat, pc.lon, map.res));
+    el.querySelector("#cv-title")?.focus?.({ preventScroll: true });
     return true;
   }
 
@@ -519,10 +540,13 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
     cancelDraw?.();
     el.classList.remove("is-open");
     document.body.classList.remove("in-country");
-    document.getElementById("globe-stage").classList.remove("is-away");
     el.querySelector(".cv-callouts")?.replaceChildren();
-    setTimeout(() => { el.hidden = true; if (map) { map.destroy(); map = null; } el.innerHTML = ""; }, reducedMotion ? 0 : 450);
+    globe.map.off("move", onMapMove);
+    removeEventListener("resize", drawCallouts);
+    if (map) { map.destroy(); map = null; }
+    globe.exitCountry();
     globe.setAutoRotate(true);
+    setTimeout(() => { if (!el.classList.contains("is-open")) { el.hidden = true; el.innerHTML = ""; } }, reducedMotion ? 0 : 450);
   }
 
   // Esc: cancel drawing first, otherwise go back to the globe (an open dialog handles its own Esc)
@@ -532,5 +556,5 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample }
     onClose("explore");
   });
 
-  return { open, close, get isOpen() { return !el.hidden; }, get iso() { return s?.iso; } };
+  return { open, close, get isOpen() { return document.body.classList.contains("in-country"); }, get iso() { return s?.iso; } };
 }

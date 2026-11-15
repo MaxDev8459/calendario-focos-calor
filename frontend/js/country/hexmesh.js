@@ -1,44 +1,26 @@
-// Hexagon mesh (M23): H3 cells over the country, coloured by harmonized count (map ramp).
-// Leaflet is lazy-loaded only for the country view (§10). Hexes pop in from the centre outward.
+// Hexagon mesh (M23) on the live map: small H3 hexagons where hotspots were detected, linked to their
+// neighbours so the fire pattern reads as a mesh (like FIRMS points, but aggregated and comparable).
+// The H3 resolution follows the zoom, so hexagons stay a few pixels wide: zoom in and they get finer.
 // AI-assisted code — see README "Use of AI".
-import { polygonToCells, latLngToCell, cellToBoundary, cellToLatLng, cellArea } from "../../vendor/geo.js";
+import { latLngToCell, cellToBoundary, cellToLatLng, cellArea, gridDisk } from "../../vendor/geo.js";
 import { RAMP } from "../config.js";
 import { T } from "../i18n/en.js";
 import { fmtInt } from "../util/format.js";
 import { reducedMotion, state, on } from "../state.js";
 
-let L = null;
-export async function loadLeaflet() {
-  if (L) return L;
-  for (const href of ["./vendor/leaflet.css", "./vendor/leaflet.draw.css"]) {
-    if (document.querySelector(`link[href="${href}"]`)) continue;
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = href;
-    document.head.prepend(link); // before our CSS so the holo styles win
-  }
-  const mod = await import("../../vendor/leaflet.js"); // Leaflet 1.9.4 + Leaflet.draw 1.0.4 (sets window.L)
-  L = mod.default;
-  return L;
-}
+const EMPTY = { type: "FeatureCollection", features: [] };
+const SHRINK = 0.66; // hexagons are drawn smaller than their cell so the links between them show
 
-export function pickResolution(areaKm2) {
-  if (areaKm2 < 3000) return 7;
-  if (areaKm2 < 120000) return 6;
-  if (areaKm2 < 700000) return 5;
-  if (areaKm2 < 5000000) return 4;
-  return 3;
-}
-
-function polyfill(geometry, res) {
-  const polys = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
-  const set = new Set();
-  for (const p of polys) {
-    try { polygonToCells(p, res, true).forEach((c) => set.add(c)); } catch { /* tiny or invalid ring */ }
-    // very small islands: keep at least the cell under the first vertex
-    if (p[0]?.length) set.add(latLngToCell(p[0][0][1], p[0][0][0], res));
-  }
-  return [...set];
+// 0.1° tiles (≈11 km) support hexagons down to res 5; closer than that we switch to the individual
+// detections (B4 points), binned into res 7–9 hexagons, so zooming in shows real detail, not a lattice.
+export const DETAIL_ZOOM = 6.2;
+export function resForZoom(z) {
+  if (z < 3.2) return 3;
+  if (z < 4.6) return 4;
+  if (z < DETAIL_ZOOM) return 5;
+  if (z < 7.6) return 6;
+  if (z < 9) return 7;
+  return 8;
 }
 
 // nice, increasing thresholds for 10 colours from the non-zero values
@@ -48,130 +30,197 @@ function quantileCuts(values) {
   const qs = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.82, 0.93];
   const nice = (x) => { if (x < 1) return Math.round(x * 10) / 10 || 0.1; if (x < 10) return Math.round(x); const p = 10 ** Math.floor(Math.log10(x)); return Math.round(x / (p / 4)) * (p / 4); };
   const out = [];
-  for (const q of qs) { let n = nice(v[Math.min(v.length - 1, Math.floor(q * v.length))]); if (out.length && n <= out[out.length - 1]) n = nice(out[out.length - 1] * 1.15 + 0.1); out.push(n); }
+  for (const q of qs) { let n = nice(v[Math.min(v.length - 1, Math.floor(q * v.length))]); const prev = out[out.length - 1]; if (out.length && n <= prev) n = prev < 10 ? Math.floor(prev) + 1 : Math.max(prev + 1, nice(prev * 1.15)); out.push(n); }
   return out;
 }
 export const colorFor = (v, cuts) => { let i = 0; while (i < cuts.length && v >= cuts[i]) i++; return RAMP[i]; };
+const stepExpr = (cuts) => { const e = ["step", ["get", "v"], RAMP[0]]; cuts.forEach((c, i) => e.push(c, RAMP[i + 1])); return e; };
 
-export function createMap(el, { americas, country, onSelect, onHover }) {
-  const map = L.map(el, {
-    zoomControl: false, attributionControl: false, preferCanvas: false, zoomSnap: 0.25, minZoom: 2, maxZoom: 10,
-    worldCopyJump: false, keyboard: true, zoomAnimation: !reducedMotion, fadeAnimation: !reducedMotion,
+function ring(h, k = 1) {
+  const [la, lo] = cellToLatLng(h);
+  const r = cellToBoundary(h, true).map(([x, y]) => [lo + (x - lo) * k, la + (y - la) * k]);
+  r.push(r[0]);
+  return r;
+}
+
+const ink = () => (state.theme === "day"
+  ? { link: "rgba(157, 2, 8, 0.32)", sel: "#2a1210", area: "#9d0208", pt: "#9d0208", ptStroke: "#fff4e4" }
+  : { link: "rgba(255, 186, 8, 0.38)", sel: "#fff4e4", area: "#ffba08", pt: "#ffba08", ptStroke: "#fff4e4" });
+
+export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, clipBbox }) {
+  const map = globe.map;
+  const before = map.getLayer("omt-country-label") ? "omt-country-label" : undefined;
+  const add = (id, src, layer) => { if (!map.getSource(src)) map.addSource(src, { type: "geojson", data: EMPTY }); if (!map.getLayer(id)) map.addLayer({ id, source: src, ...layer }, before); };
+  const I = ink();
+  add("area-fill", "area", { type: "fill", paint: { "fill-color": I.area, "fill-opacity": 0.06 } });
+  add("hx-links", "hx-links", { type: "line", layout: { "line-cap": "round" }, paint: { "line-color": I.link, "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.5, 8, 1.2] } });
+  add("hx-glow", "hx-centers", {
+    type: "circle",
+    filter: [">=", ["get", "t"], 0.55],
+    paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 5, 6, 9, 9, 14], "circle-color": stepExpr([1, 2, 3, 4, 5, 6, 7, 8, 9]), "circle-blur": 1, "circle-opacity": 0.45 },
   });
-  const svgRenderer = L.svg({ padding: 0.5 });
-  const canvasRenderer = L.canvas({ padding: 0.5 });
+  add("hx-fill", "hx", { type: "fill", paint: { "fill-color": RAMP[5], "fill-opacity": 0, "fill-opacity-transition": { duration: reducedMotion ? 0 : 900, delay: 0 } } });
+  add("hx-sel", "hx-sel", { type: "line", paint: { "line-color": I.sel, "line-width": 2.4 } });
+  add("area-line", "area", { type: "line", paint: { "line-color": I.area, "line-width": 1.6, "line-dasharray": [3, 2] } });
+  add("pts", "pts", { type: "circle", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 2.2, 9, 4.5], "circle-color": I.pt, "circle-stroke-color": I.ptStroke, "circle-stroke-width": 0.8, "circle-opacity": 0.95 } });
 
-  // graticule (faint)
-  const grat = [];
-  for (let lon = -180; lon <= 180; lon += 10) grat.push([[-80, lon], [85, lon]]);
-  for (let lat = -80; lat <= 80; lat += 10) grat.push([[lat, -180], [lat, 180]]);
-  L.polyline(grat, { className: "map-grat", interactive: false, weight: 1 }).addTo(map);
+  let cells = [], points = [], counts = new Map(), cuts = [], res = resForZoom(map.getZoom()), selected = null, pointTip = null, firstPaint = true;
+  let mode = "cells", pointsKey = "", pointsTimer = 0;
 
-  // neighbours
-  L.geoJSON(americas, { interactive: false, style: () => ({ className: "map-land", weight: 1 }) }).addTo(map);
-  // selected country
-  const countryLayer = L.geoJSON(country, { interactive: false, style: () => ({ className: "map-country", weight: 1.5 }) }).addTo(map);
-
-  let hexLayer = null, hexIndex = new Map(), cuts = [], selected = null, areaRect = null, pointsLayer = null;
-
-  function setHexes(cells, counts, { animate = true } = {}) {
-    if (hexLayer) hexLayer.remove();
-    hexIndex = new Map();
-    const values = cells.map((h) => counts.get(h) ?? 0);
-    cuts = quantileCuts(values);
-    const useSvg = cells.length <= 2600;
-    const center = map.getCenter();
-    const feats = cells.map((h, i) => {
-      const ring = cellToBoundary(h, true);
-      ring.push(ring[0]);
-      const [la, lo] = cellToLatLng(h);
-      return { type: "Feature", properties: { h, v: values[i], d: Math.hypot(la - center.lat, (lo - center.lng) * Math.cos((la * Math.PI) / 180)) }, geometry: { type: "Polygon", coordinates: [ring] } };
-    });
-    const maxD = Math.max(...feats.map((f) => f.properties.d), 1);
-    hexLayer = L.geoJSON({ type: "FeatureCollection", features: feats }, {
-      renderer: useSvg ? svgRenderer : canvasRenderer,
-      style: (f) => ({ className: "hx", fillColor: colorFor(f.properties.v, cuts), fillOpacity: 0.92, color: state.theme === "day" ? "#f5ece1" : "#0b0507", weight: 0.8, opacity: 0.9 }),
-      onEachFeature: (f, layer) => {
-        hexIndex.set(f.properties.h, layer);
-        layer.on("click", () => onSelect(f.properties.h));
-        layer.on("mouseover", (e) => onHover({ h: f.properties.h, v: f.properties.v, e }));
-        layer.on("mouseout", () => onHover(null));
-      },
-    }).addTo(map);
-    if (useSvg && animate && !reducedMotion) {
-      hexLayer.eachLayer((layer) => {
-        const p = layer.getElement?.();
-        if (!p) return;
-        const d = layer.feature.properties.d / maxD;
-        p.style.animationDelay = `${Math.round(d * 900 + Math.random() * 120)}ms`;
-        p.classList.add("hx-pop");
-      });
+  function build() {
+    counts = new Map();
+    const list = mode === "points" ? points : cells;
+    for (const c of list) {
+      const h = latLngToCell(c.lat_c, c.lon_c, res);
+      counts.set(h, (counts.get(h) ?? 0) + (c.conteo ?? 0));
     }
+    const hexes = [...counts.keys()].filter((h) => counts.get(h) > 0);
+    const values = hexes.map((h) => counts.get(h));
+    cuts = quantileCuts(values);
+    const tOf = (v) => { let i = 0; while (i < cuts.length && v >= cuts[i]) i++; return i / cuts.length; };
+    const fill = [], centers = [], links = [];
+    const have = new Set(hexes);
+    for (const h of hexes) {
+      const v = counts.get(h);
+      const [la, lo] = cellToLatLng(h);
+      fill.push({ type: "Feature", properties: { h, v }, geometry: { type: "Polygon", coordinates: [ring(h, SHRINK)] } });
+      centers.push({ type: "Feature", properties: { v, t: tOf(v) }, geometry: { type: "Point", coordinates: [lo, la] } });
+      for (const n of gridDisk(h, 1)) {
+        if (n <= h || !have.has(n)) continue;
+        const [la2, lo2] = cellToLatLng(n);
+        links.push([[lo, la], [lo2, la2]]);
+      }
+    }
+    map.getSource("hx").setData({ type: "FeatureCollection", features: fill });
+    map.getSource("hx-centers").setData({ type: "FeatureCollection", features: centers });
+    map.getSource("hx-links").setData({ type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "MultiLineString", coordinates: links } }] });
+    map.setPaintProperty("hx-fill", "fill-color", stepExpr(cuts));
+    map.setPaintProperty("hx-glow", "circle-color", ["step", ["get", "t"], RAMP[0], ...cuts.flatMap((_, i) => [(i + 1) / cuts.length, RAMP[i + 1]])]);
+    if (firstPaint && !reducedMotion) {
+      map.setPaintProperty("hx-fill", "fill-opacity", 0);
+      requestAnimationFrame(() => requestAnimationFrame(() => map.setPaintProperty("hx-fill", "fill-opacity", 0.95)));
+      firstPaint = false;
+    } else map.setPaintProperty("hx-fill", "fill-opacity", 0.95);
+    onRes?.({ res, cuts, mode });
     return { cuts, values };
   }
 
+  function setCells(list) { cells = list; if (mode === "cells") return build(); refreshPoints(true); return { cuts }; }
+
+  // detail mode: fetch the detections for what is on screen (inside the clip box), debounced
+  function refreshPoints(force = false) {
+    if (!loadPoints) return;
+    clearTimeout(pointsTimer);
+    pointsTimer = setTimeout(async () => {
+      const b = map.getBounds();
+      const c = clipBbox?.() ?? [-180, -90, 180, 90];
+      const bb = [Math.max(b.getWest(), c[0]), Math.max(b.getSouth(), c[1]), Math.min(b.getEast(), c[2]), Math.min(b.getNorth(), c[3])].map((v) => Math.round(v * 100) / 100);
+      if (bb[0] >= bb[2] || bb[1] >= bb[3]) return;
+      const key = bb.join(",");
+      if (!force && key === pointsKey) { build(); return; }
+      pointsKey = key;
+      try {
+        const feats = await loadPoints(bb);
+        if (mode !== "points" || key !== pointsKey) return;
+        points = feats.map((f) => ({ lat_c: f.geometry.coordinates[1], lon_c: f.geometry.coordinates[0], conteo: 1 }));
+        build();
+      } catch { /* keep what is shown */ }
+    }, force ? 0 : 280);
+  }
+
+  const onZoom = () => {
+    const z = map.getZoom();
+    const nextMode = loadPoints && z >= DETAIL_ZOOM ? "points" : "cells";
+    const r = resForZoom(z);
+    if (nextMode !== mode) { mode = nextMode; res = r; if (mode === "points") refreshPoints(true); else build(); return; }
+    if (mode === "points") { res = r; refreshPoints(); return; }
+    if (r !== res && cells.length) { res = r; build(); }
+  };
+  map.on("moveend", onZoom);
+
+  const enter = () => (map.getCanvas().style.cursor = "pointer");
+  const move = (e) => {
+    const f = e.features?.[0];
+    if (!f) return;
+    onHover({ h: f.properties.h, v: f.properties.v, mode, x: e.originalEvent.clientX, y: e.originalEvent.clientY });
+  };
+  const leave = () => { map.getCanvas().style.cursor = ""; onHover(null); };
+  const click = (e) => { const f = e.features?.[0]; if (f) onSelect(f.properties.h); };
+  const ptMove = (e) => {
+    const f = e.features?.[0];
+    if (!f || !pointTip) return;
+    onHover({ text: pointTip(f.properties), x: e.originalEvent.clientX, y: e.originalEvent.clientY });
+  };
+  map.on("mouseenter", "hx-fill", enter);
+  map.on("mousemove", "hx-fill", move);
+  map.on("mouseleave", "hx-fill", leave);
+  map.on("click", "hx-fill", click);
+  map.on("mousemove", "pts", ptMove);
+  map.on("mouseleave", "pts", leave);
+
   function select(h) {
-    if (selected && hexIndex.get(selected)) hexIndex.get(selected).setStyle({ weight: 0.8, color: state.theme === "day" ? "#f5ece1" : "#0b0507" });
     selected = h;
-    const layer = h && hexIndex.get(h);
-    if (layer) { layer.setStyle({ weight: 2.6, color: state.theme === "day" ? "#2a1210" : "#fff4e4" }); layer.bringToFront(); }
+    map.getSource("hx-sel").setData(h ? { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring(h, 1)] } }] } : EMPTY);
   }
-
   function setArea(bbox) {
-    areaRect?.remove();
-    areaRect = null;
-    if (!bbox) return;
-    areaRect = L.rectangle([[bbox[1], bbox[0]], [bbox[3], bbox[2]]], { className: "map-area", weight: 1.6, fill: true, fillOpacity: 0.06, interactive: false }).addTo(map);
+    map.getSource("area").setData(bbox ? { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[2], bbox[3]], [bbox[0], bbox[3]], [bbox[0], bbox[1]]]] } } : EMPTY);
   }
-
   function setPoints(features, tooltipFor) {
-    pointsLayer?.remove();
-    pointsLayer = null;
-    if (!features) return;
-    pointsLayer = L.layerGroup(
-      features.map((f) => L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], { renderer: canvasRenderer, radius: 3, weight: 1, color: "#fff4e4", fillColor: "#FFBA08", fillOpacity: 0.95, className: "pt" }).bindTooltip(tooltipFor(f.properties), { className: "map-tip", direction: "top", offset: [0, -4] })),
-    ).addTo(map);
+    pointTip = tooltipFor ?? null;
+    map.getSource("pts").setData(features ? { type: "FeatureCollection", features } : EMPTY);
   }
-
-  on("theme", () => { if (hexLayer) hexLayer.setStyle((f) => ({ color: state.theme === "day" ? "#f5ece1" : "#0b0507" })); select(selected); });
+  const restyle = () => {
+    const I = ink();
+    map.setPaintProperty("hx-links", "line-color", I.link);
+    map.setPaintProperty("hx-sel", "line-color", I.sel);
+    map.setPaintProperty("area-fill", "fill-color", I.area);
+    map.setPaintProperty("area-line", "line-color", I.area);
+    map.setPaintProperty("pts", "circle-color", I.pt);
+  };
+  const offTheme = on("theme", () => { if (alive) restyle(); });
+  let alive = true;
 
   // keep the country clear of the title (top-left), tools (left), cards (right) and legend (bottom)
   const insets = () => (innerWidth > 960
-    ? { paddingTopLeft: [210, 230], paddingBottomRight: [Math.min(440, innerWidth * 0.34) + 90, 110] }
-    : { paddingTopLeft: [16, 170], paddingBottomRight: [16, 170] });
+    ? { top: 210, left: 230, right: Math.min(460, innerWidth * 0.34) + 70, bottom: 120 }
+    : { top: 190, left: 20, right: 20, bottom: 200 });
 
   return {
     map,
-    fitCountry() { map.fitBounds(countryLayer.getBounds(), { ...insets(), animate: false }); },
-    // cap the zoom so the country-level hexagons stay readable around a small drawn area
-    fitBbox(b) {
-      const o = insets();
-      const cap = map.getBoundsZoom(countryLayer.getBounds(), false, L.point(o.paddingTopLeft).add(o.paddingBottomRight)) + 1;
-      map.fitBounds([[b[1], b[0]], [b[3], b[2]]], { ...o, maxZoom: cap, animate: !reducedMotion });
+    setCells,
+    select,
+    setArea,
+    setPoints,
+    insets,
+    fitBbox(b, { capZoom } = {}) {
+      map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: insets(), maxZoom: capZoom ?? 9, duration: reducedMotion ? 0 : 900 });
     },
-    setHexes, select, setArea, setPoints,
-    hexCenterPoint(h) { const [la, lo] = cellToLatLng(h); return map.latLngToContainerPoint([la, lo]); },
+    hexCenterPoint(h) { const [la, lo] = cellToLatLng(h); return map.project([lo, la]); },
+    countOf(h) { return counts.get(h) ?? null; },
+    get res() { return res; },
+    get mode() { return mode; },
+    reloadPoints() { if (mode === "points") refreshPoints(true); },
     get cuts() { return cuts; },
-    destroy() { map.remove(); },
+    destroy() {
+      alive = false;
+      offTheme?.();
+      map.off("moveend", onZoom);
+      clearTimeout(pointsTimer);
+      map.off("mouseenter", "hx-fill", enter);
+      map.off("mousemove", "hx-fill", move);
+      map.off("mouseleave", "hx-fill", leave);
+      map.off("click", "hx-fill", click);
+      map.off("mousemove", "pts", ptMove);
+      map.off("mouseleave", "pts", leave);
+      for (const src of ["hx", "hx-centers", "hx-links", "hx-sel", "area", "pts"]) map.getSource(src)?.setData(EMPTY);
+    },
   };
-}
-
-export function computeHexes(geometry, res, cellsResp) {
-  const hexes = polyfill(geometry, res);
-  const set = new Set(hexes);
-  const counts = new Map();
-  for (const c of cellsResp.celdas) {
-    const h = latLngToCell(c.lat_c, c.lon_c, res);
-    if (!set.has(h)) continue;
-    counts.set(h, (counts.get(h) ?? 0) + (c.conteo ?? 0));
-  }
-  return { hexes, counts };
 }
 
 export function hexInfo(h) {
   const [lat, lon] = cellToLatLng(h);
-  const ring = cellToBoundary(h);
-  const lats = ring.map((p) => p[0]), lons = ring.map((p) => p[1]);
+  const r = cellToBoundary(h);
+  const lats = r.map((p) => p[0]), lons = r.map((p) => p[1]);
   return { lat, lon, areaKm2: cellArea(h, "km2"), bbox: [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)] };
 }
 

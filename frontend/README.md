@@ -42,9 +42,9 @@ js/main.js            boot, hash router, section choreography
 js/config.js          API_BASE, active regions, colour ramps, date limits
 js/i18n/en.js         every visible string (English only)
 js/api/client.js      fetch, error mapping, normalizers for contract v0.3, sample fallback
-js/globe/             globe.gl hologram, heat-wave shader, explore controls
+js/globe/             live MapLibre globe (holo styling, heat waves), explore controls
 js/story/             hero intro, horizontal story
-js/country/           Leaflet + H3 hexagons, draw tool, calendar, anomaly, charts
+js/country/           H3 hexagon mesh on the same map, draw tool, calendar, anomaly, charts
 js/ui/                top bar, coming soon, legends, icons, toast
 data/                 Natural Earth country layers, factores.json, metadata.json
 mocks/                deterministic sample-data generator + real example responses
@@ -79,17 +79,15 @@ The frontend already handles these. When an endpoint is missing, it uses a fallb
 - **Hotspot data:** NASA FIRMS (MODIS Collection 6.1 and VIIRS 375 m S-NPP). Heat Atlas is not an official NASA product.
 - **Harmonization:** the project team's per-country, per-month MODIS→VIIRS factors (`data/factores.json`).
 - **Country borders:** Natural Earth admin-0 (public domain).
+- **Map labels, rivers and roads:** vector tiles from [OpenFreeMap](https://openfreemap.org/), © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright) (ODbL) and OpenMapTiles. They need an internet connection. Without it the globe still works with the local Natural Earth borders, just without place names.
 
 ## Libraries and licenses
 
 | Library | Version | License |
 |---|---|---|
-| globe.gl | 2.46.2 | MIT |
-| three.js | 0.187.0 | MIT |
+| MapLibre GL JS | 6.18.0 | BSD-3-Clause |
 | GSAP + ScrollTrigger | 3.15.1 | GSAP Standard "no charge" license |
 | Lenis | 1.3.27 | MIT |
-| Leaflet | 1.9.4 | BSD-2-Clause |
-| Leaflet.draw | 1.0.4 | MIT |
 | h3-js | 4.5.0 | Apache-2.0 |
 | d3-geo, d3-scale, d3-shape | 3.1.2, 4.0.3, 3.2.1 | ISC |
 | Instrument Serif, Inter, JetBrains Mono (via Fontsource) | | SIL Open Font License 1.1 |

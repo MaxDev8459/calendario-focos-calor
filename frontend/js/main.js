@@ -68,6 +68,7 @@ async function boot() {
     onSample(g.sample);
     if (g.sample) $("[data-sample-note]")?.removeAttribute("hidden");
     totals = Object.fromEntries((g.paises ?? []).map((p) => [p.iso_a2, p.conteo]));
+    explore?.refreshPicker?.();
     const cells = g.celdas.map((c) => ({ ...c, active: isActiveRegion(c.region ?? "north_america") }));
     globe.setHotspots(cells);
     return cells;
@@ -107,10 +108,12 @@ async function boot() {
   });
   const country = initCountryView($("#country-view"), {
     globe, waves, getMeta: () => state.metadata, onSample,
+    openCountry: (iso) => routeTo(`#country=${iso}`),
+    totals: () => totals,
     onClose: (target) => {
       country.close();
-      globe.setLayout("explore", { ms: 0 });
-      globe.pov(AMERICAS_POV.lat, AMERICAS_POV.lng, 1.75, 1200);
+      globe.setLayout("explore", { keepPov: true });
+      globe.pov(AMERICAS_POV.lat, AMERICAS_POV.lng, innerWidth < 768 ? 2.5 : 1.75, 1600);
       routeTo(target === "hero" ? "#hero" : "#explore");
     },
   });
@@ -158,7 +161,7 @@ async function boot() {
       await country.open({ iso: f.properties.iso2, bbox: p.bbox?.split(",").map(Number), from: p.from, to: p.to, cell: p.cell, month: p.month });
       return;
     }
-    if (country.isOpen) { country.close(); lenis?.start(); }
+    if (country.isOpen) { country.close(); lenis?.start(); requestAnimationFrame(() => applyLayout(state.section === "country" ? "explore" : state.section)); }
     if (p.region) {
       scrollToEl(document.getElementById("explore"), { immediate: true });
       const pov = REGION_POV[p.region] ?? REGION_POV.other;
