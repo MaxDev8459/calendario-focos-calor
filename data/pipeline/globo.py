@@ -70,9 +70,9 @@ def globo(con, fuentes, desde, hasta, malla=MALLA_GLOBO):
         SELECT round((floor(lat_c / $m) + 0.5) * $m, 3) AS lat,
                round((floor(lon_c / $m) + 0.5) * $m, 3) AS lon,
                round(sum(conteo), 1) AS conteo,
-               arg_max(coalesce(region, 'north_america'), conteo) AS region
+               arg_max(coalesce(region, 'north_america'), (conteo, coalesce(region, 'north_america'))) AS region
         FROM ({base})
-        GROUP BY 1, 2 ORDER BY conteo DESC
+        GROUP BY 1, 2 ORDER BY conteo DESC, lat, lon
     """, {"m": malla, "d": d, "h": h}).fetchall()
     paises = con.execute(f"""
         SELECT iso_a2, round(sum(conteo)) AS conteo
