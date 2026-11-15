@@ -1,4 +1,4 @@
-// Colour legend (M12): numbers always sit next to the colours. AI-assisted code — see README "Use of AI".
+// Colour legend (M12): numbers always sit next to the colours.
 import { RAMP } from "../config.js";
 import { fmtInt } from "../util/format.js";
 

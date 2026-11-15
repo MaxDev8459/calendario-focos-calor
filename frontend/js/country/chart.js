@@ -1,5 +1,4 @@
 // Before/after harmonization chart (M16) and small series charts. Labels are HTML (M2).
-// AI-assisted code — see README "Use of AI".
 import { scaleLinear } from "../../vendor/geo.js";
 import { line, curveMonotoneX, area } from "../../vendor/geo.js";
 import { T } from "../i18n/en.js";

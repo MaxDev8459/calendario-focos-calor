@@ -1,5 +1,4 @@
 // Top bar: logo, nav, time zone, day/night, Locate me (M21). No login UI (M3).
-// AI-assisted code — see README "Use of AI".
 import { T, REGION_NAMES } from "../i18n/en.js";
 import { icons } from "./icons.js";
 import { state, set, on, safeSet, emit } from "../state.js";

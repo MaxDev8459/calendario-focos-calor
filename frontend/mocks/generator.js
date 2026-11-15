@@ -1,6 +1,5 @@
 // Mock API — returns SAMPLE data in the exact shape of backend contract v0.1
 // (plus the v0.2 fields Frontend requested). Used when VITE_USE_MOCK=true or when the API is unreachable.
-// AI-assisted code — see README "Use of AI".
 import { CLUSTERS, FACTORS, FIRST_YEAR, FIRST_MONTH, LAST_COMPLETE, GENERATED_AT, bboxCount, bboxFraction, season, yearFactor, density, hash, isAvailable } from "./model.js";
 
 const pad = (n) => String(n).padStart(2, "0");

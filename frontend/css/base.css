@@ -1,4 +1,4 @@
-/* Base, reset and browser surfaces. AI-assisted code — see README "Use of AI". */
+/* Base, reset and browser surfaces. */
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }

@@ -1,7 +1,6 @@
 // Deterministic SAMPLE fire model used only in mock mode.
 // Every number it produces is simulated and is labelled "Sample data" in the UI.
 // The shapes it returns follow backend contract v0.1 (+ requested v0.2 fields).
-// AI-assisted code — see README "Use of AI".
 
 // Fire "clusters": centre, spread (degrees), annual weight (harmonized hotspots), peak month, season width, trend.
 // Rough, plausible geography for the demo — not a scientific model.

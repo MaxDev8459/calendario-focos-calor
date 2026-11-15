@@ -1,6 +1,5 @@
 // Horizontal scrollytelling (M22): pinned section, card track moves sideways, the globe stays.
 // Each chapter rotates the globe to the region it talks about. Mobile: vertical cards.
-// AI-assisted code — see README "Use of AI".
 import { gsap, ScrollTrigger } from "../../vendor/motion.js";
 import { T } from "../i18n/en.js";
 import { icons } from "../ui/icons.js";

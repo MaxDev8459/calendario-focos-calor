@@ -1,7 +1,6 @@
 // Hexagon mesh (M23) on the live map: small H3 hexagons where hotspots were detected, linked to their
 // neighbours so the fire pattern reads as a mesh (like FIRMS points, but aggregated and comparable).
 // The H3 resolution follows the zoom, so hexagons stay a few pixels wide: zoom in and they get finer.
-// AI-assisted code — see README "Use of AI".
 import { latLngToCell, cellToBoundary, cellToLatLng, cellArea, gridDisk } from "../../vendor/geo.js";
 import { RAMP } from "../config.js";
 import { T } from "../i18n/en.js";

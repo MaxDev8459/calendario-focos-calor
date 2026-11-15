@@ -1,4 +1,4 @@
-// "Coming soon" card for regions outside ACTIVE_REGIONS (M24). AI-assisted code — see README "Use of AI".
+// "Coming soon" card for regions outside ACTIVE_REGIONS (M24).
 import { T, REGION_NAMES } from "../i18n/en.js";
 
 export function initComingSoon(el, { onBack }) {

@@ -1,4 +1,4 @@
-// Boot, hash router and section choreography. AI-assisted code — see README "Use of AI".
+// Boot, hash router and section choreography.
 import { gsap, ScrollTrigger, Lenis } from "../vendor/motion.js";
 import { T, REGION_NAMES } from "./i18n/en.js";
 import { PILOT_BBOX, USE_MOCK } from "./config.js";

@@ -1,6 +1,5 @@
 // Burn calendar (M13): years × months, coloured by harmonized count with the contract's 7 cuts (8 colours).
 // role="grid" with roving tabindex and arrow keys. null = grey hatch, 0 = lowest colour (0 ≠ null).
-// AI-assisted code — see README "Use of AI".
 import { RAMP, VIIRS_START_YEAR } from "../config.js";
 import { T, MONTHS_INITIAL, MONTHS_SHORT } from "../i18n/en.js";
 import { fmtInt, fmtNum, monthName, fmtPct } from "../util/format.js";

@@ -1,6 +1,5 @@
 // Anomaly card (M14): count, multi-year mean & median, anomaly % vs both, percentile, rank.
 // Formula: (current − baseline) / baseline × 100. Signed number always shown next to colour (M12).
-// AI-assisted code — see README "Use of AI".
 import { DIVERGING } from "../config.js";
 import { T, LABELS } from "../i18n/en.js";
 import { fmtInt, fmtNum, fmtPct, monthName, ordinal } from "../util/format.js";

@@ -1,5 +1,4 @@
 // Method, Data, About and footer (M5, M6, M7, M16). Real factors come from factores.json (contract A3).
-// AI-assisted code — see README "Use of AI".
 import { T, MONTHS_SHORT, MONTHS } from "./i18n/en.js";
 import { TEAM_NAME, RAMP } from "./config.js";
 import { renderBeforeAfter, annualize } from "./country/chart.js";
@@ -110,10 +109,8 @@ export function renderData(el) {
           <p class="muted small">${d.csvLead}</p>
           <dl class="csv-cols">${d.csvColumns.map(([k, v]) => `<div><dt class="mono" translate="no">${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
         </section>
-        <section class="panel" aria-labelledby="ai-title">
-          <h3 id="ai-title" class="label">${d.aiTitle}</h3>
-          <p>${d.ai}</p>
-          <h3 class="label">${d.licensesTitle}</h3>
+        <section class="panel" aria-labelledby="lic-title">
+          <h3 id="lic-title" class="label">${d.licensesTitle}</h3>
           <p class="muted">${d.licenses}</p>
         </section>
       </div>

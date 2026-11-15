@@ -1,5 +1,4 @@
 // Hero + intro sequence (M20, §4.4): frame lights, hologram draws itself, title reveals word by word.
-// AI-assisted code — see README "Use of AI".
 import { geoOrthographic, geoPath } from "../../vendor/geo.js";
 import { T } from "../i18n/en.js";
 import { icons } from "../ui/icons.js";

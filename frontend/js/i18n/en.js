@@ -1,6 +1,5 @@
 // M1 — every visible UI string lives here. Components never hard-code copy.
 // Contract keys (anio, mes, conteo, fuente…) are mapped to English labels in LABELS.
-// AI-assisted code — see README "Use of AI".
 import { SITE_NAME, TEAM_NAME } from "../config.js";
 
 export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -368,8 +367,6 @@ export const T = {
       ["dia_noche", "D = day, N = night"],
       ["ty, tx", "0.1° query tile: floor(lat ÷ 0.1), floor(lon ÷ 0.1)"],
     ],
-    aiTitle: "Use of AI",
-    ai: "Parts of this website’s code were written with an AI coding assistant and reviewed by the team. No AI-generated images, video or audio are used; the globe, waves and charts are drawn in code from the data. Any AI-generated media added later will carry a visible “AI-generated” watermark.",
     licensesTitle: "Libraries & licenses",
     licenses: "MapLibre GL JS (BSD-3-Clause), h3-js (Apache 2.0), GSAP (Standard no-charge license), Lenis (MIT), d3 (ISC), Instrument Serif, Inter and JetBrains Mono (SIL Open Font License). Full list in the README.",
   },

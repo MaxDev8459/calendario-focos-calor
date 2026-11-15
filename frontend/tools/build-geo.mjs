@@ -1,7 +1,6 @@
 // Builds the slimmed country layers used by the globe and the country view.
 // Source: Natural Earth admin-0 countries (public domain), 110m and 50m.
 // Usage: node tools/build-geo.mjs <ne_110m.geojson> <ne_50m.geojson>
-// AI-assisted code — see README "Use of AI".
 import { readFileSync, writeFileSync } from "node:fs";
 
 const [src110, src50] = process.argv.slice(2);

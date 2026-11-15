@@ -1,6 +1,5 @@
 // Country picker: a searchable combobox (ARIA 1.2 pattern) listing every active country with its
 // 12-month hotspot total. Large in Explore, compact inside the country view to jump to another country.
-// AI-assisted code — see README "Use of AI".
 import { T } from "../i18n/en.js";
 import { icons } from "./icons.js";
 import { allCountries } from "../util/geo.js";

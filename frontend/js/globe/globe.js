@@ -3,7 +3,6 @@
 // Base geometry comes from our own Natural Earth files (always available); OpenFreeMap vector tiles add
 // names, coastlines, rivers, roads and state borders when the network allows. Text is never baked into
 // images: map labels are live text and every other label is an HTML overlay (M2).
-// AI-assisted code — see README "Use of AI".
 import * as maplibregl from "../../vendor/maplibre/maplibre-gl.mjs";
 import { RAMP, INACTIVE_GREY, VIIRS_BLUE } from "../config.js";
 import { state, on, reducedMotion } from "../state.js";

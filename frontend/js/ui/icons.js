@@ -1,4 +1,4 @@
-// Authored line icons, one stroke weight. Decorative: aria-hidden. AI-assisted code — see README "Use of AI".
+// Authored line icons, one stroke weight. Decorative: aria-hidden.
 const s = (d, extra = "") => `<svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" ${extra}>${d}</svg>`;
 export const icons = {
   clock: s('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),

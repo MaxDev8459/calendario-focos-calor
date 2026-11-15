@@ -1,5 +1,4 @@
 // Formatting — always en-US as the source language (§9) so browser translation works from English.
-// AI-assisted code — see README "Use of AI".
 import { MONTHS, MONTHS_SHORT } from "../i18n/en.js";
 import { state } from "../state.js";
 

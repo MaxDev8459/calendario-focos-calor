@@ -93,7 +93,3 @@ The frontend already handles these. When an endpoint is missing, it uses a fallb
 | Instrument Serif, Inter, JetBrains Mono (via Fontsource) | | SIL Open Font License 1.1 |
 
 The project's own code is released under the MIT License (see `../LICENSE`).
-
-## Use of AI
-
-Parts of this frontend were written with the help of an AI coding assistant, under the team's direction, and were reviewed and tested by the team. Files that contain AI-assisted code say so in their header comment. No AI-generated images, video or audio are used. The globe, heat waves, maps and charts are all drawn in code from the data. If AI-generated media is added later, it will carry a visible "AI-generated" watermark.

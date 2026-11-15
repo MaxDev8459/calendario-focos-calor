@@ -1,6 +1,5 @@
 // Country view (M11, M13–M19, M23): hex mesh + four floating cards with callout lines,
 // plus the detected-vs-reported block. Full state lives in the URL hash (M17 shareable link).
-// AI-assisted code — see README "Use of AI".
 import { T, REGION_NAMES, LABELS } from "../i18n/en.js";
 import { RAMP, FIRST_MONTH, LAST_MONTH_FALLBACK, VIIRS_START_YEAR } from "../config.js";
 import { icons } from "../ui/icons.js";

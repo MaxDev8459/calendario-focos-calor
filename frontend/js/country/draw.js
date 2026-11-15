@@ -1,6 +1,5 @@
 // Draw area / type coordinates (M11). Both produce bbox = west,south,east,north (5 decimals).
 // A single lat/lon point creates a 0.5° box around it. English validation messages (M1).
-// AI-assisted code — see README "Use of AI".
 import { T } from "../i18n/en.js";
 import { round5 } from "../util/geo.js";
 

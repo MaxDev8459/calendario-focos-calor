@@ -1,6 +1,5 @@
 // Heat-wave background (M20, §4.3.6): slow domain-warped noise in fire colours, rendered at low
 // resolution and scaled up by CSS. Opacity is driven by the current section (M22).
-// AI-assisted code — see README "Use of AI".
 import { state, on, reducedMotion } from "../state.js";
 
 const FRAG = `

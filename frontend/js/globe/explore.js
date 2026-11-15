@@ -1,6 +1,5 @@
 // Explore (M23): pinned globe — the wheel rotates it instead of scrolling, drag spins, click a country zooms.
 // "Continue" and Esc release the pin. Keyboard path: the country list.
-// AI-assisted code — see README "Use of AI".
 import { T, REGION_NAMES } from "../i18n/en.js";
 import { icons } from "../ui/icons.js";
 import { legendHTML } from "../ui/legend.js";

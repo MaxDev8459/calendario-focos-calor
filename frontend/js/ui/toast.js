@@ -1,4 +1,4 @@
-// Polite status toast. AI-assisted code — see README "Use of AI".
+// Polite status toast.
 let timer;
 export function toast(msg, ms = 4200) {
   const el = document.getElementById("toast");

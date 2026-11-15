@@ -1,5 +1,4 @@
 // Country geometry helpers (Natural Earth, public domain).
-// AI-assisted code — see README "Use of AI".
 import { geoContains, geoBounds, geoArea, geoCentroid } from "../../vendor/geo.js";
 import { ACTIVE_REGIONS } from "../config.js";
 

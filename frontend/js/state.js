@@ -1,4 +1,4 @@
-// Tiny global store with change events. AI-assisted code — see README "Use of AI".
+// Tiny global store with change events.
 const listeners = new Map();
 
 function safeGet(key) {

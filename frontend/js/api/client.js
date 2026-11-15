@@ -2,7 +2,6 @@
 // Responses are normalized to one internal shape. Each result carries `sample: true` when it came from
 // the simulated generator, so the UI can label it "Sample data" (§12). Real example responses from
 // data/ejemplo/respuestas_api/ are served as-is for their exact requests.
-// AI-assisted code — see README "Use of AI".
 import { API_URL, USE_MOCK, MAX_POINTS } from "../config.js";
 import { ERRORS } from "../i18n/en.js";
 import { landTest } from "../util/geo.js";

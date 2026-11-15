@@ -1,5 +1,4 @@
 // Central configuration. SITE_NAME is a placeholder: change it here only.
-// AI-assisted code — see README "Use of AI".
 export const SITE_NAME = "Heat Atlas";
 // The API URL lives here only (team rule). Leave it empty to run on sample data.
 // For testing, the page also accepts ?api=https://…/api or ?mock=1 in the address bar.
