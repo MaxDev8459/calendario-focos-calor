@@ -3,7 +3,7 @@ export const SITE_NAME = "Heat Atlas";
 // The API URL lives here only (team rule). Leave it empty to run on sample data.
 // For testing, the page also accepts ?api=https://…/api or ?mock=1 in the address bar.
 const params = new URLSearchParams(location.search);
-const API_BASE = ""; // ← set the deployed API here, e.g. "https://<service>.onrender.com/api"
+const API_BASE = "https://focos-calor-api.vercel.app/api"; // deployed API (Vercel). Leave empty to run on sample data.
 export const TEAM_NAME = "the Heat Atlas team"; // ← replace with the official team name
 export const API_URL = (params.get("api") ?? API_BASE).replace(/\/$/, "");
 export const USE_MOCK = params.get("mock") === "1" || !API_URL;

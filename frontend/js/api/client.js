@@ -47,7 +47,8 @@ async function get(path, params) {
     let body = null;
     try { body = await res.json(); } catch { /* not JSON */ }
     if (body?.mensaje) console.warn(`[api] ${path}: ${body.error} — ${body.mensaje}`); // raw Spanish text stays in the console (M1)
-    if (res.status === 404 && !body?.error) throw new ApiError("not_found");
+    // 404 without a body, or a route the deployed API does not have yet (contract v0.4: "no_encontrado"), falls back to sample data
+    if (res.status === 404 && (!body?.error || body.error === "no_encontrado")) throw new ApiError("not_found");
     throw new ApiError(body?.error ?? (res.status >= 500 ? "network" : "default"), body);
   }
   return res.json();
