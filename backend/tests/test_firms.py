@@ -14,7 +14,9 @@ import pytest
 from app.firms import config
 from app.firms.actualizar import actualizar, archivos_nrt, dias_por_mes, primer_dia_sin_historico
 from app.firms.cliente import ClienteFirms, ErrorFirms, planear_fuentes, tramos
-from app.firms.normalizar import COLUMNAS_A1, celdas_fijas, escribir_parquets, normalizar, quitar_fuentes_fijas
+from app.firms.noaa20 import medir_factores
+from app.firms.normalizar import (COLUMNAS_A1, celdas_fijas, escribir_parquets, normalizar, quitar_fuentes_fijas,
+                                  quitar_persistentes)
 
 LLAVE = "llave_de_prueba_123"
 ENCABEZADO = "latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,instrument,confidence,version,bright_ti5,frp,daynight"
@@ -40,15 +42,17 @@ class FirmsFalso:
 
     QUEMADOR = (18.45123, -93.15321)
 
-    def __init__(self, sin_datos=()):
+    def __init__(self, sin_datos=(), sin_snpp=(), disponibilidad=None):
         self.peticiones = []
         self.sin_datos = set(sin_datos)
+        self.sin_snpp = set(sin_snpp)          # días sin S-NPP (NOAA-20 sí tiene)
+        self.disponibilidad = disponibilidad or DISPONIBILIDAD
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.peticiones.append(request.url.path)
         partes = request.url.path.strip("/").split("/")
         if partes[:3] == ["api", "data_availability", "csv"]:
-            return httpx.Response(200, text=DISPONIBILIDAD)
+            return httpx.Response(200, text=self.disponibilidad)
         if partes[:3] == ["api", "area", "csv"]:
             _, _, _, llave, fuente, zona, dias, inicio = partes
             if llave != LLAVE:
@@ -57,13 +61,18 @@ class FirmsFalso:
                 return httpx.Response(400, text="Invalid day range. Expects [1..5].")
             d0 = date.fromisoformat(inicio)
             sp = fuente.endswith("_SP")
+            n20 = "NOAA20" in fuente
+            sat = "N20" if n20 else "N"
             filas = []
             for i in range(int(dias)):
                 d = (d0 + timedelta(days=i)).isoformat()
-                if d in self.sin_datos:
+                if d in self.sin_datos or (not n20 and d in self.sin_snpp):
                     continue
-                dia = [(fila(18.73412, -99.10233, d), "0"), (fila(18.73499, -99.10101, d, hora="1942", conf="h", dn="D"), "0"),
-                       (fila(27.32601, -90.7181, d, frp="40.2"), "3"), (fila(*self.QUEMADOR, d, frp="25.0"), "2")]
+                dia = [(fila(18.73412, -99.10233, d, sat=sat), "0"),
+                       (fila(18.73499, -99.10101, d, hora="1942", sat=sat, conf="h", dn="D"), "0"),
+                       (fila(27.32601, -90.7181, d, sat=sat, frp="40.2"), "3"), (fila(*self.QUEMADOR, d, sat=sat, frp="25.0"), "2")]
+                if n20:   # NOAA-20 ve una celda más que S-NPP cada día: factor S-NPP/NOAA-20 = 0.5
+                    dia.append((fila(18.80511, -99.20577, d, sat=sat), "0"))
                 filas += [f"{f},{t}" if sp else f for f, t in dia]
             if not filas:
                 return httpx.Response(200, text="")
@@ -342,3 +351,114 @@ def test_periodo_por_defecto_empieza_despues_del_historico():
 
 def test_dias_por_mes():
     assert dias_por_mes(date(2026, 10, 30), date(2026, 11, 2)) == {"2026-10": [2, 31], "2026-11": [2, 30]}
+
+
+# ---------- NOAA-20 para los días sin S-NPP (P37) ----------
+def det_sintetico(pais, sat, conteos_por_mes, anio=2026):
+    """Una fila por celda-día: `conteos_por_mes` = {mes: (días, celdas por día)}."""
+    filas = []
+    for mes, (dias, celdas) in conteos_por_mes.items():
+        for d in range(1, dias + 1):
+            for k in range(celdas):
+                filas.append({"fecha": date(anio, mes, d), "lat": 18.005 + 0.01 * k, "lon": -99.005, "pais": pais,
+                              "satelite": sat})
+    return pd.DataFrame(filas)
+
+
+def dias_de(meses, anio=2026, dias=25):
+    return {date(anio, m, d) for m in meses for d in range(1, dias + 1)}
+
+
+def test_factor_es_la_mediana_mensual_y_se_valida_dejando_un_mes_fuera():
+    # razones S-NPP/NOAA-20 por mes: 0.8, 0.9, 1.0 y 1.2 → mediana 0.95
+    snpp = det_sintetico("Mexico", "SNPP", {1: (25, 4), 2: (25, 9), 3: (25, 10), 4: (25, 6)})
+    n20 = det_sintetico("Mexico", "NOAA20", {1: (25, 5), 2: (25, 10), 3: (25, 10), 4: (25, 5)})
+    m = medir_factores(snpp, n20, dias_de([1, 2, 3, 4]), ["Mexico"])
+    assert m["factores"] == {"Mexico": 0.95}
+    v = m["por_pais"]["Mexico"]
+    assert (v["origen"], v["meses"]) == ("pais", 4)
+    enero = v["por_mes"][0]
+    assert enero["mes"] == "2026-01" and enero["factor_sin_el_mes"] == 1.0      # mediana de 0.9, 1.0 y 1.2
+    assert enero["error_pct"] == round(100 * (1.0 * 125 - 100) / 100, 1)        # 25 %
+    assert v["error_max_abs_pct"] == max(abs(x["error_pct"]) for x in v["por_mes"])
+
+
+def test_pais_con_pocos_meses_usa_el_factor_de_la_zona():
+    snpp = pd.concat([det_sintetico("Mexico", "SNPP", {1: (25, 2), 2: (25, 2), 3: (25, 2)}),
+                      det_sintetico("Belize", "SNPP", {1: (25, 2)})])
+    n20 = pd.concat([det_sintetico("Mexico", "NOAA20", {1: (25, 4), 2: (25, 4), 3: (25, 4)}),
+                     det_sintetico("Belize", "NOAA20", {1: (25, 4)})])
+    m = medir_factores(snpp, n20, dias_de([1, 2, 3]), ["Mexico", "Belize"])
+    assert m["factores"] == {"Mexico": 0.5, "Belize": 0.5}
+    assert m["por_pais"]["Belize"]["origen"] == "zona" and m["zona"]["meses"] == 3
+
+
+def test_meses_con_pocos_dias_comunes_no_cuentan_y_sin_meses_el_factor_es_1():
+    snpp = det_sintetico("Mexico", "SNPP", {11: (2, 3)})
+    n20 = det_sintetico("Mexico", "NOAA20", {11: (2, 6)})
+    m = medir_factores(snpp, n20, {date(2026, 11, 1), date(2026, 11, 2)}, ["Mexico"])
+    assert m["factores"] == {"Mexico": 1.0} and m["por_pais"]["Mexico"]["origen"] == "respaldo_factor_1"
+
+
+def test_normalizar_noaa20_solo_si_se_pide():
+    crudo = pd.read_csv(io.StringIO(csv_viirs([fila(18.7, -99.1, "2026-11-10", sat="N20"),
+                                               fila(18.7, -99.1, "2026-11-10", sat="N")])), dtype=str)
+    assert list(normalizar(crudo, "Mexico", "VIIRS_SNPP_NRT")["satelite"]) == ["SNPP"]
+    assert list(normalizar(crudo, "Mexico", "VIIRS_NOAA20_NRT", satelites={"NOAA20"})["satelite"]) == ["NOAA20"]
+
+
+def test_quitar_persistentes_en_todas_las_filas():
+    det = pd.DataFrame({"lat": [18.7341, 18.9001], "lon": [-99.1023, -99.2001], "es_nrt": [False, True]})
+    pers = pd.DataFrame({"fy": [1873], "fx": [-9911]})
+    assert list(quitar_persistentes(det, pers)["lat"]) == [18.9001]
+    assert len(quitar_persistentes(det, None)) == 2
+
+
+def test_conteos_con_noaa20_ponderados_y_fuente_propia(det_ejemplo, tmp_path):
+    n20 = det_ejemplo.assign(fecha=date(2026, 11, 5), satelite="NOAA20", es_nrt=True, es_n20=True, peso=0.8)
+    det = pd.concat([det_ejemplo.assign(es_n20=False, peso=1.0), n20], ignore_index=True)
+    escribir_parquets(det, tmp_path)
+    c = duckdb.sql(f"SELECT mes, fuente, sum(conteo_viirs), sum(conteo_armonizado) FROM "
+                   f"'{tmp_path / 'conteos_celda_mes_nrt.parquet'}' GROUP BY 1, 2 ORDER BY 1").fetchall()
+    sep, nov = c[0], c[-1]
+    assert nov[1] == "VIIRS_NRT_N20" and sep[1] != "VIIRS_NRT_N20"
+    # noviembre: 1 celda-día de S-NPP (día 2) + 2 celdas-día de NOAA-20 (día 5) × 0.8
+    assert (nov[2], nov[3]) == (3, pytest.approx(1 + 2 * 0.8))
+
+
+def test_actualizar_llena_con_noaa20_los_dias_sin_snpp(tmp_path):
+    disp = ("data_id,min_date,max_date\n"
+            "VIIRS_SNPP_SP,2012-01-20,2026-08-31\n"
+            "VIIRS_SNPP_NRT,2026-08-01,2026-09-05\n"
+            "VIIRS_NOAA20_SP,2018-04-01,2026-08-31\n"
+            "VIIRS_NOAA20_NRT,2026-08-01,2026-09-10\n")
+    falso = FirmsFalso(sin_snpp=["2026-07-15"], disponibilidad=disp)
+    cliente = ClienteFirms(map_key=LLAVE, url_base="https://firms.test", dir_cache=tmp_path / "cache", pausa_s=0,
+                           http=httpx.Client(transport=httpx.MockTransport(falso)))
+    meta = actualizar(["Mexico"], date(2026, 6, 1), date(2026, 9, 10), cliente=cliente, dir_salida=tmp_path / "nrt")
+    n = meta["noaa20"]
+    assert n["dias"] == ["2026-07-15"] + [f"2026-09-{d:02d}" for d in range(6, 11)]
+    assert n["meses"] == ["2026-07", "2026-09"] and n["preliminar"] and n["fuente_api"] == "VIIRS_NRT_N20"
+    assert n["factores"] == {"Mexico": 0.5}
+    v = n["por_pais"]["Mexico"]
+    assert (v["origen"], v["meses"], v["error_max_abs_pct"]) == ("pais", 3, 0.0)    # jun, jul y ago
+    assert meta["hasta"] == "2026-09-10" and meta["dias_sin_datos"] == []
+    assert meta["dias_por_mes"]["2026-07"] == [31, 31] and meta["dias_por_mes"]["2026-09"] == [10, 30]
+    a = archivos_nrt(tmp_path / "nrt")
+    c = dict((m, (f, x)) for m, f, x in duckdb.sql(
+        f"SELECT mes, any_value(fuente), sum(conteo_armonizado) FROM '{a['conteos']}' GROUP BY 1").fetchall())
+    assert c[6] == ("VIIRS", 30.0) and c[8] == ("VIIRS", 31.0)          # agosto sigue en SP
+    assert c[7] == ("VIIRS_NRT_N20", 31.0)          # 30 días S-NPP + 1 día NOAA-20 (2 celdas × 0.5)
+    assert c[9] == ("VIIRS_NRT_N20", 10.0)          # 5 días S-NPP + 5 días NOAA-20 (2 celdas × 0.5)
+    sats = dict(duckdb.sql(f"SELECT satelite, count(*) FROM '{a['detecciones']}' GROUP BY 1").fetchall())
+    assert sats["NOAA20"] == 6 * 3                   # solo los días de relleno: 3 focos de México por día
+
+
+def test_actualizar_sin_noaa20(tmp_path):
+    disp = DISPONIBILIDAD + "VIIRS_NOAA20_NRT,2026-08-01,2026-11-13\n"
+    falso = FirmsFalso(disponibilidad=disp)
+    cliente = ClienteFirms(map_key=LLAVE, url_base="https://firms.test", dir_cache=tmp_path / "cache", pausa_s=0,
+                           http=httpx.Client(transport=httpx.MockTransport(falso)))
+    meta = actualizar(["Mexico"], date(2026, 8, 25), date(2026, 9, 5), cliente=cliente,
+                      dir_salida=tmp_path / "nrt", con_noaa20=False)
+    assert "noaa20" not in meta and not any("NOAA20" in p for p in falso.peticiones)

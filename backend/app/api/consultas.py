@@ -6,9 +6,10 @@ de referencia de `data/ejemplo/respuestas_api/` (las pruebas comparan contra eso
 import calendar
 import csv
 import io
-from datetime import date
+from datetime import date, timedelta
 
 from .. import datos
+from . import globo as _globo
 from .validar import ErrorApi, cuadros
 
 CAMBIO = (2012, 2)            # VIIRS S-NPP completo desde febrero de 2012 (contrato, A2)
@@ -88,16 +89,28 @@ class Serie:
             meses_nrt = {(d.year, d.month) for fu in m_rec.get("fuentes", []) if fu["fuente"].endswith("_NRT")
                          for d in (date.fromisoformat(fu["desde"]), date.fromisoformat(fu["hasta"]))}
             primero_nrt = min(meses_nrt) if meses_nrt else None
+            # Meses con días de NOAA-20 llevado a S-NPP (contrato v0.4): fuente propia y `preliminar`.
+            meses_n20 = set((m_rec.get("noaa20") or {}).get("meses", []))
             for clave, (dias, total) in sorted(m_rec.get("dias_por_mes", {}).items()):
                 am = _ym(clave)
                 if am <= self.ultimo:
                     continue
                 c = nrt.get(am, (0.0, None, None))[0]
+                fuente = ("VIIRS_NRT_N20" if clave in meses_n20
+                          else "VIIRS_NRT" if primero_nrt and am >= primero_nrt else "VIIRS")
                 self.celdas[am] = {"anio": am[0], "mes": am[1],
                                    "conteo": round(c or 0.0, 1) if dias else None,
-                                   "fuente": "VIIRS_NRT" if primero_nrt and am >= primero_nrt else "VIIRS",
-                                   "dias_con_datos": dias, "dias_mes": total}
+                                   "fuente": fuente, "dias_con_datos": dias, "dias_mes": total}
+                if clave in meses_n20:
+                    self.celdas[am]["preliminar"] = True
                 self.crudos[am] = (None, int(c or 0) if dias else None)
+            # Meses recientes sin registro en metadata_nrt (huecos): sin datos, no cero.
+            siguiente = (self.ultimo[0] + 1, 1) if self.ultimo[1] == 12 else (self.ultimo[0], self.ultimo[1] + 1)
+            for am in _meses(siguiente, max(self.celdas)):
+                if am not in self.celdas:
+                    self.celdas[am] = {"anio": am[0], "mes": am[1], "conteo": None, "fuente": "VIIRS",
+                                       "dias_con_datos": 0, "dias_mes": calendar.monthrange(*am)[1]}
+                    self.crudos[am] = (None, None)
         self.fin = max(self.celdas)
 
     def mediana_mensual(self):
@@ -108,9 +121,12 @@ def calendario(bbox, desde=None, hasta=None) -> dict:
     s = Serie(bbox)
     if not s.hay_datos:
         raise ErrorApi("sin_datos")
-    desde, hasta = max(desde or s.primer, s.primer), min(hasta or s.fin, s.fin)
+    desde, hasta = desde or s.primer, hasta or s.fin
     if desde > hasta:
         raise ErrorApi("fecha_invalida")
+    desde, hasta = max(desde, s.primer), min(hasta, s.fin)      # se recorta a lo que hay
+    if desde > hasta:
+        raise ErrorApi("sin_datos")                             # periodo bien escrito, pero fuera de los datos
     celdas = [s.celdas[am] for am in _meses(desde, hasta)]
     mediana = s.mediana_mensual()
     nz = sorted(s.celdas[am]["conteo"] for am in s.completos if s.celdas[am]["conteo"] > 0)
@@ -136,6 +152,8 @@ def anomalia(bbox, anio: int, mes: int) -> dict:
            "anomalia_pct": round(100 * (comparado - med) / med, 1) if med else None,
            "percentil": round(100 * sum(1 for v in vals if v < comparado) / len(vals)),
            "lugar": vals.index(comparado) + 1, "de_anios": len(vals), "fuente": actual["fuente"]}
+    if actual.get("preliminar"):
+        out["preliminar"] = True
     if reciente:
         out.update(dias_con_datos=actual["dias_con_datos"], dias_mes=actual["dias_mes"], incompleto=incompleto)
         if incompleto:
@@ -173,7 +191,7 @@ def celdas(bbox, desde=None, hasta=None) -> dict:
     cur = datos.cursor(f["conteos"], rec["conteos"] if rec else None)
     filas = cur.execute(
         f"SELECT ty, tx, any_value(lat_c), any_value(lon_c), round(sum(c), 1) AS conteo FROM ({' UNION ALL '.join(partes)}) "
-        f"GROUP BY ty, tx ORDER BY conteo DESC LIMIT {MAX_CELDAS + 1}", valores).fetchall()
+        f"GROUP BY ty, tx ORDER BY conteo DESC, ty, tx LIMIT {MAX_CELDAS + 1}", valores).fetchall()
     return {"bbox": list(bbox), "unidad": "focos_armonizados", "truncado": len(filas) > MAX_CELDAS,
             "celdas": [{"ty": ty, "tx": tx, "lat_c": la, "lon_c": lo, "conteo": c} for ty, tx, la, lo, c in filas[:MAX_CELDAS]]}
 
@@ -198,13 +216,15 @@ def _consulta_focos(bbox, desde: date, hasta: date):
         partes.append(parte)
         valores += [rec["detecciones"], max(desde, date.fromordinal(fin_hist.toordinal() + 1)), hasta, *params, s, n, o, e]
     if not partes:
-        raise ErrorApi("sin_datos")
+        return None, None, None                                 # el periodo no toca ni el histórico ni los recientes
     cur = datos.cursor(f["detecciones"], rec["detecciones"] if rec else None)
     return cur, " UNION ALL ".join(partes), valores
 
 
 def focos_csv(bbox, desde: date, hasta: date) -> str:
     cur, sql, valores = _consulta_focos(bbox, desde, hasta)
+    if cur is None:
+        raise ErrorApi("sin_datos")
     total = cur.execute(f"SELECT count(*) FROM ({sql})", valores).fetchall()[0][0]
     if total > MAX_FILAS_CSV:
         raise ErrorApi("rango_muy_grande")
@@ -213,20 +233,86 @@ def focos_csv(bbox, desde: date, hasta: date) -> str:
     salida = io.StringIO()
     w = csv.writer(salida, lineterminator="\n")
     w.writerow(COLUMNAS_A1)
-    w.writerows(cur.execute(f"SELECT * FROM ({sql}) ORDER BY fecha, hora_utc", valores).fetchall())
+    w.writerows(cur.execute(f"SELECT * FROM ({sql}) ORDER BY fecha, hora_utc, lat, lon", valores).fetchall())
     return salida.getvalue()
+
+
+def _ultimo_dia_con_datos() -> date:
+    """Último día que pueden tener los datos (fin del histórico o de los focos recientes)."""
+    ultimo = _ym(datos.fuentes()["metadata"]["ultimo_mes_completo"])
+    fin = date(ultimo[0], ultimo[1], calendar.monthrange(*ultimo)[1])
+    rec = datos.nrt()
+    try:
+        return max(fin, date.fromisoformat(rec["metadata"]["hasta"])) if rec else fin
+    except (KeyError, TypeError, ValueError):
+        return fin
 
 
 def focos_geojson(bbox, desde: date, hasta: date) -> dict:
     cur, sql, valores = _consulta_focos(bbox, desde, hasta)
+    if cur is None:
+        return {"type": "FeatureCollection", "total": 0, "truncado": False, "features": []}
     total = cur.execute(f"SELECT count(*) FROM ({sql})", valores).fetchall()[0][0]
-    filas = cur.execute(f"SELECT fecha, hora_utc, lat, lon, sensor, frp_mw, confianza, dia_noche FROM ({sql}) "
-                        f"ORDER BY fecha DESC, hora_utc DESC LIMIT {MAX_PUNTOS_MAPA}", valores).fetchall()
+    if total > MAX_PUNTOS_MAPA:
+        # Solo se devuelven los más recientes. Ordenar millones de filas leídas por internet tarda decenas
+        # de segundos, así que se busca hacia atrás, en ventanas cada vez más grandes, el tramo final que
+        # ya contiene MAX_PUNTOS_MAPA focos (contar es barato: el Parquet se salta los grupos por fecha).
+        fin, dias = min(hasta, _ultimo_dia_con_datos()), 31
+        while True:
+            inicio = max(desde, fin - timedelta(days=dias))
+            cur, sql, valores = _consulta_focos(bbox, inicio, hasta)
+            if inicio == desde or cur.execute(f"SELECT count(*) FROM ({sql})", valores).fetchall()[0][0] >= MAX_PUNTOS_MAPA:
+                break
+            dias *= 4
+    filas = cur.execute(f"SELECT fecha, hora_utc, lat, lon, sensor, frp_mw, confianza, dia_noche, satelite FROM ({sql}) "
+                        f"ORDER BY fecha DESC, hora_utc DESC, lat, lon LIMIT {MAX_PUNTOS_MAPA}", valores).fetchall()
+
+    def propiedades(fe, ho, se, frp, co, dn, sat):
+        p = {"fecha": fe.isoformat(), "sensor": se, "frp_mw": frp, "confianza": co, "hora_utc": ho,
+             "dia_noche": dn, "satelite": sat}
+        if sat == "NOAA20":          # días sin S-NPP llenados con NOAA-20 (contrato v0.4)
+            p["preliminar"] = True
+        return p
+
     return {"type": "FeatureCollection", "total": total, "truncado": total > MAX_PUNTOS_MAPA,
             "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [lon, lat]},
-                          "properties": {"fecha": fe.isoformat(), "sensor": se, "frp_mw": frp, "confianza": co,
-                                         "hora_utc": ho, "dia_noche": dn}}
-                         for fe, ho, lat, lon, se, frp, co, dn in filas]}
+                          "properties": propiedades(fe, ho, se, frp, co, dn, sat)}
+                         for fe, ho, lat, lon, se, frp, co, dn, sat in filas]}
+
+
+def globo(desde=None, hasta=None) -> dict:
+    """B6: conteos armonizados de toda América en celdas de 0.5° y por país (globo de la portada).
+
+    Sin periodo, usa los 12 meses que terminan en el último mes completo del histórico. Los focos
+    recientes (NRT) solo se suman si el periodo pasa del histórico.
+    """
+    f = datos.fuentes()
+    ultimo = _ym(f["metadata"]["ultimo_mes_completo"])
+    if hasta is None:
+        hasta = ultimo
+        if desde and desde > ultimo:                            # solo `desde` y ya en los meses recientes
+            fin = _ultimo_dia_con_datos()
+            hasta = max(desde, (fin.year, fin.month))
+    desde = desde or ((hasta[0], 1) if hasta[1] == 12 else (hasta[0] - 1, hasta[1] + 1))
+    if desde > hasta:
+        raise ErrorApi("fecha_invalida")
+    rutas = [f["conteos"]]
+    rec = datos.nrt() if hasta > ultimo else None
+    if rec:
+        rutas.append(rec["conteos"])
+    cur = datos.cursor(*rutas)
+    try:
+        out = _globo.globo(cur, rutas, _txt(desde), _txt(hasta))
+    except ValueError as e:
+        raise ErrorApi("fecha_invalida") from e
+    except Exception as e:
+        if len(rutas) == 1:
+            raise
+        datos.log.warning("No se pudieron leer los focos recientes para el globo: %s", e)  # el histórico sigue
+        out = _globo.globo(datos.cursor(rutas[0]), rutas[:1], _txt(desde), _txt(hasta))
+    out["celdas"].sort(key=lambda c: (-c["conteo"], c["lat"], c["lon"]))    # orden estable en los empates
+    out["paises"].sort(key=lambda p: (-p["conteo"], p["iso_a2"]))
+    return out
 
 
 def metadata() -> dict:
@@ -236,4 +322,6 @@ def metadata() -> dict:
     if rec:
         m = rec["metadata"]
         out["recientes"] = {k: m.get(k) for k in ("generado", "paises", "desde", "hasta", "fuentes", "dias_por_mes", "dias_sin_datos")}
+        if m.get("noaa20"):
+            out["recientes"]["noaa20"] = m["noaa20"]
     return out

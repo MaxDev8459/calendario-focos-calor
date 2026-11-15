@@ -4,6 +4,8 @@ Reglas iguales a las del pipeline de datos (data/pipeline/generar_ejemplo.py):
 - Solo VIIRS S-NPP (y MODIS Aqua si se pide MODIS); sin confianza baja; `type == 0` si la columna existe
   (las fuentes NRT no traen `type`, así que ahí no se puede filtrar).
 - Conteo = celdas-día con fuego en malla de 0.01°, agrupadas por cuadro de 0.1° (ty, tx) y mes.
+- Sin fuentes de calor persistentes: se quitan las celdas de 0.01° de A5 (`celdas_persistentes.parquet`).
+- NOAA-20 solo entra en los días sin S-NPP, con `peso` = factor S-NPP/NOAA-20 (ver noaa20.py).
 """
 from pathlib import Path
 
@@ -23,8 +25,10 @@ SATELITES = {
 SATELITES_DE_LA_SERIE = {"SNPP", "Aqua"}
 
 
-def normalizar(crudo: pd.DataFrame, pais: str, fuente: str) -> pd.DataFrame:
-    """crudo: CSV de FIRMS leído como texto. Devuelve columnas A1 + `es_nrt`."""
+def normalizar(crudo: pd.DataFrame, pais: str, fuente: str, satelites=SATELITES_DE_LA_SERIE) -> pd.DataFrame:
+    """crudo: CSV de FIRMS leído como texto. Devuelve columnas A1 + `es_nrt`.
+
+    `satelites`: los que se conservan (por defecto S-NPP y Aqua; {"NOAA20"} para NOAA-20)."""
     if crudo is None or crudo.empty:
         return pd.DataFrame(columns=COLUMNAS_A1 + ["es_nrt"])
     df = crudo.rename(columns=str.lower).copy()
@@ -37,7 +41,7 @@ def normalizar(crudo: pd.DataFrame, pais: str, fuente: str) -> pd.DataFrame:
         df = df[texto("type") == "0"]
 
     df = df.assign(satelite=texto("satellite").str.upper().map(SATELITES))
-    df = df[df["satelite"].isin(SATELITES_DE_LA_SERIE)]
+    df = df[df["satelite"].isin(set(satelites))]
 
     if es_modis:
         conf = pd.to_numeric(df["confidence"], errors="coerce")
@@ -106,6 +110,16 @@ def quitar_fuentes_fijas(det: pd.DataFrame, fijas: pd.DataFrame) -> pd.DataFrame
     return m[quedan].drop(columns=["fy", "fx", "_fija"]).reset_index(drop=True)
 
 
+def quitar_persistentes(det: pd.DataFrame, persistentes: pd.DataFrame | None) -> pd.DataFrame:
+    """Quita las filas que caen en una celda persistente de A5 (fy, fx de 0.01°), igual que A1 y A2."""
+    if det is None or det.empty or persistentes is None or persistentes.empty:
+        return det
+    fijas = persistentes[["fy", "fx"]].drop_duplicates().astype("int64").assign(_p=True)
+    m = det.assign(fy=np.floor(det["lat"] / 0.01).astype("int64"), fx=np.floor(det["lon"] / 0.01).astype("int64"))
+    m = m.merge(fijas, on=["fy", "fx"], how="left")
+    return m[~m["_p"].eq(True)].drop(columns=["fy", "fx", "_p"]).reset_index(drop=True)
+
+
 _SQL_DETECCIONES = """
 SELECT CAST(fecha AS DATE) AS fecha, CAST(hora_utc AS VARCHAR) AS hora_utc,
        CAST(lat AS DOUBLE) AS lat, CAST(lon AS DOUBLE) AS lon, CAST(pais AS VARCHAR) AS pais,
@@ -116,17 +130,20 @@ FROM det ORDER BY fecha, hora_utc
 """
 
 # Celdas-día únicas (malla 0.01°) → conteo por cuadro de 0.1° y mes, con los tipos exactos de A2.
-# El mes es VIIRS_NRT si alguno de sus días vino de la fuente NRT; si todo vino de SP, es VIIRS.
+# Fuente del mes: VIIRS_NRT_N20 si algún día vino de NOAA-20; si no, VIIRS_NRT si alguno vino de la fuente
+# NRT; si todo vino de SP, VIIRS. conteo_viirs = celdas-día crudas; conteo_armonizado = celdas-día × peso
+# (1 para S-NPP; el factor S-NPP/NOAA-20 para NOAA-20).
 _SQL_CONTEOS = """
 WITH det_viirs AS (SELECT * FROM det WHERE sensor = 'VIIRS'),
 cd AS (
-    SELECT DISTINCT pais, CAST(fecha AS DATE) AS fecha,
+    SELECT pais, CAST(fecha AS DATE) AS fecha,
            CAST(floor(lat / 0.01) AS INTEGER) AS fy, CAST(floor(lon / 0.01) AS INTEGER) AS fx,
-           CAST(ty AS INTEGER) AS ty, CAST(tx AS INTEGER) AS tx
-    FROM det_viirs
+           CAST(ty AS INTEGER) AS ty, CAST(tx AS INTEGER) AS tx, max(peso) AS peso
+    FROM det_viirs GROUP BY 1, 2, 3, 4, 5, 6
 ),
 meses AS (
-    SELECT year(CAST(fecha AS DATE)) AS anio, month(CAST(fecha AS DATE)) AS mes, bool_or(es_nrt) AS hay_nrt
+    SELECT year(CAST(fecha AS DATE)) AS anio, month(CAST(fecha AS DATE)) AS mes,
+           bool_or(es_nrt) AS hay_nrt, bool_or(es_n20) AS hay_n20
     FROM det_viirs GROUP BY 1, 2
 )
 SELECT cd.pais, cd.ty, cd.tx,
@@ -135,8 +152,8 @@ SELECT cd.pais, cd.ty, cd.tx,
        CAST(year(cd.fecha) AS INTEGER) AS anio, CAST(month(cd.fecha) AS TINYINT) AS mes,
        CAST(NULL AS UINTEGER) AS conteo_modis,
        CAST(count(*) AS UINTEGER) AS conteo_viirs,
-       CAST(count(*) AS DOUBLE) AS conteo_armonizado,
-       CASE WHEN any_value(m.hay_nrt) THEN 'VIIRS_NRT' ELSE 'VIIRS' END AS fuente
+       CAST(round(sum(cd.peso), 4) AS DOUBLE) AS conteo_armonizado,
+       CASE WHEN any_value(m.hay_n20) THEN 'VIIRS_NRT_N20' WHEN any_value(m.hay_nrt) THEN 'VIIRS_NRT' ELSE 'VIIRS' END AS fuente
 FROM cd JOIN meses m ON m.anio = year(cd.fecha) AND m.mes = month(cd.fecha)
 GROUP BY cd.pais, cd.ty, cd.tx, year(cd.fecha), month(cd.fecha)
 ORDER BY anio, mes, ty, tx
@@ -150,7 +167,8 @@ def _vacio() -> pd.DataFrame:
                          "satelite": pd.Series(dtype="object"), "confianza": pd.Series(dtype="object"),
                          "frp_mw": pd.Series(dtype="float64"), "dia_noche": pd.Series(dtype="object"),
                          "ty": pd.Series(dtype="int32"), "tx": pd.Series(dtype="int32"),
-                         "es_nrt": pd.Series(dtype="bool")})
+                         "es_nrt": pd.Series(dtype="bool"), "es_n20": pd.Series(dtype="bool"),
+                         "peso": pd.Series(dtype="float64")})
 
 
 def _copiar(con, sql: str, destino: Path):
@@ -166,6 +184,10 @@ def escribir_parquets(det: pd.DataFrame, dir_salida: Path) -> dict:
     """Escribe detecciones_nrt.parquet (A1) y conteos_celda_mes_nrt.parquet (A2). Devuelve filas de cada uno."""
     if det is None or det.empty:
         det = _vacio()
+    if "es_n20" not in det.columns:
+        det = det.assign(es_n20=False)
+    if "peso" not in det.columns:
+        det = det.assign(peso=1.0)
     con = duckdb.connect()
     con.register("det", det)
     _copiar(con, _SQL_DETECCIONES, Path(dir_salida) / "detecciones_nrt.parquet")
