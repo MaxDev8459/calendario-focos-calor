@@ -31,7 +31,7 @@ MIN_MESES_PAIS = 12    # el factor del país necesita ≥ 12 meses válidos; si 
 
 CARPETA_TRABAJO = "intermedio"
 
-VERSION_CONTRATO = "0.3"
+VERSION_CONTRATO = "0.6"
 # A1 (detecciones.parquet, ~700 MB) no cabe en git: se publica como archivo de un release
 RELEASE_DATOS = "datos-v1"
 URL_DETECCIONES = ("https://github.com/MaxDev8459/calendario-focos-calor/releases/download/"
