@@ -1,6 +1,6 @@
 // Hexagon mesh (M23) on the live map: small H3 hexagons where hotspots were detected, linked to their
 // neighbours so the fire pattern reads as a mesh (like FIRMS points, but aggregated and comparable).
-// The H3 resolution follows the zoom, so hexagons stay a few pixels wide: zoom in and they get finer.
+// The H3 resolution follows the zoom so every hexagon stays big enough on screen to point at and select.
 import { latLngToCell, cellToBoundary, cellToLatLng, cellArea, gridDisk } from "../../vendor/geo.js";
 import { ramp } from "../util/ramp.js";
 import { T } from "../i18n/en.js";
@@ -8,18 +8,21 @@ import { fmtInt } from "../util/format.js";
 import { reducedMotion, state, on } from "../state.js";
 
 const EMPTY = { type: "FeatureCollection", features: [] };
-const SHRINK = 0.66; // hexagons are drawn smaller than their cell so the links between them show
+const SHRINK = 0.78; // hexagons are drawn a bit smaller than their cell so the links between them show
+const HIT_PX = 9; // pointer tolerance: a hexagon is picked when the pointer is this close to it
 
 // 0.1° tiles (≈11 km) support hexagons down to res 5; closer than that we switch to the individual
 // detections (B4 points), binned into res 7–9 hexagons, so zooming in shows real detail, not a lattice.
 export const DETAIL_ZOOM = 6.2;
-export function resForZoom(z) {
-  if (z < 3.2) return 3;
-  if (z < 4.6) return 4;
-  if (z < DETAIL_ZOOM) return 5;
-  if (z < 7.6) return 6;
-  if (z < 9) return 7;
-  return 8;
+// The resolution is chosen from the hexagon's size on screen, so a hexagon is never smaller than
+// MIN_EDGE_PX (≈ 14 px across) and stays easy to point at and select at every zoom.
+const EDGE_M = { 3: 68979, 4: 26072, 5: 9854, 6: 3725, 7: 1406, 8: 531, 9: 201 }; // H3 mean edge length
+const MIN_EDGE_PX = 7;
+export function resForZoom(z, lat = 0, maxRes = 9) {
+  const mpp = (78271.517 * Math.cos((Math.max(-80, Math.min(80, lat)) * Math.PI) / 180)) / 2 ** z; // metres per pixel
+  let r = 3;
+  for (let k = 4; k <= maxRes; k++) if (EDGE_M[k] / mpp >= MIN_EDGE_PX) r = k;
+  return r;
 }
 
 // nice, increasing thresholds for 10 colours from the non-zero values
@@ -63,7 +66,7 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
   add("area-line", "area", { type: "line", paint: { "line-color": I.area, "line-width": 1.6, "line-dasharray": [3, 2] } });
   add("pts", "pts", { type: "circle", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 2.2, 9, 4.5], "circle-color": I.pt, "circle-stroke-color": I.ptStroke, "circle-stroke-width": 0.8, "circle-opacity": 0.95 } });
 
-  let cells = [], points = [], counts = new Map(), cuts = [], res = resForZoom(map.getZoom()), selected = null, pointTip = null, firstPaint = true;
+  let cells = [], points = [], counts = new Map(), cuts = [], res = 3, selected = null, pointTip = null, firstPaint = true;
   let mode = "cells", pointsKey = "", pointsTimer = 0;
 
   function build() {
@@ -108,7 +111,7 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
     map.setPaintProperty("hx-fill", "fill-color", stepExpr(cuts));
     map.setPaintProperty("hx-glow", "circle-color", ["step", ["get", "t"], R[0], ...cuts.flatMap((_, i) => [(i + 1) / cuts.length, R[i + 1]])]);
   }
-  function setCells(list) { cells = list; if (mode === "cells") return build(); refreshPoints(true); return { cuts }; }
+  function setCells(list) { cells = list; if (mode === "cells") { res = resForZoom(map.getZoom(), map.getCenter().lat, 5); return build(); } refreshPoints(true); return { cuts }; }
 
   // detail mode: fetch the detections for what is on screen (inside the clip box), debounced
   function refreshPoints(force = false) {
@@ -134,30 +137,46 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
   const onZoom = () => {
     const z = map.getZoom();
     const nextMode = loadPoints && z >= DETAIL_ZOOM ? "points" : "cells";
-    const r = resForZoom(z);
+    // the 0.1° tiles support res 5 at most; the individual detections go down to res 9
+    const r = resForZoom(z, map.getCenter().lat, nextMode === "points" ? 9 : 5);
     if (nextMode !== mode) { mode = nextMode; res = r; if (mode === "points") refreshPoints(true); else build(); return; }
     if (mode === "points") { res = r; refreshPoints(); return; }
     if (r !== res && cells.length) { res = r; build(); }
   };
   map.on("moveend", onZoom);
 
-  const enter = () => (map.getCanvas().style.cursor = "pointer");
+  // nearest hexagon within HIT_PX of the pointer (not only the one exactly under it)
+  function pick(pt) {
+    if (!map.getLayer("hx-fill")) return null;
+    const fs = map.queryRenderedFeatures([[pt.x - HIT_PX, pt.y - HIT_PX], [pt.x + HIT_PX, pt.y + HIT_PX]], { layers: ["hx-fill"] });
+    let best = null, bd = Infinity;
+    for (const f of fs) {
+      const [la, lo] = cellToLatLng(f.properties.h);
+      const p = map.project([lo, la]);
+      const d = (p.x - pt.x) ** 2 + (p.y - pt.y) ** 2;
+      if (d < bd) { bd = d; best = f; }
+    }
+    return best;
+  }
+  let hovering = false;
   const move = (e) => {
-    const f = e.features?.[0];
-    if (!f) return;
+    if (globe.isDrawing?.()) return;
+    const f = pick(e.point);
+    if (!f) { if (hovering) { hovering = false; map.getCanvas().style.cursor = ""; onHover(null); } return; }
+    hovering = true;
+    map.getCanvas().style.cursor = "pointer";
     onHover({ h: f.properties.h, v: f.properties.v, mode, x: e.originalEvent.clientX, y: e.originalEvent.clientY });
   };
-  const leave = () => { map.getCanvas().style.cursor = ""; onHover(null); };
-  const click = (e) => { const f = e.features?.[0]; if (f) onSelect(f.properties.h); };
+  const leave = () => { hovering = false; map.getCanvas().style.cursor = ""; onHover(null); };
+  const click = (e) => { if (globe.isDrawing?.()) return; const f = pick(e.point); if (f) onSelect(f.properties.h); };
   const ptMove = (e) => {
     const f = e.features?.[0];
     if (!f || !pointTip) return;
     onHover({ text: pointTip(f.properties), x: e.originalEvent.clientX, y: e.originalEvent.clientY });
   };
-  map.on("mouseenter", "hx-fill", enter);
-  map.on("mousemove", "hx-fill", move);
-  map.on("mouseleave", "hx-fill", leave);
-  map.on("click", "hx-fill", click);
+  map.on("mousemove", move);
+  map.on("mouseout", leave);
+  map.on("click", click);
   map.on("mousemove", "pts", ptMove);
   map.on("mouseleave", "pts", leave);
 
@@ -185,9 +204,17 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
   let alive = true;
 
   // keep the country clear of the title (top-left), tools (left), cards (right) and legend (bottom)
-  const insets = () => (innerWidth > 960
-    ? { top: 210, left: 230, right: Math.min(460, innerWidth * 0.34) + 70, bottom: 120 }
-    : { top: 190, left: 20, right: 20, bottom: 200 });
+  // The country is framed in the free space between the left column and the right panel,
+  // measured from the page itself so nothing ever lands under a card.
+  const insets = () => {
+    if (innerWidth < 768) return { top: 190, left: 20, right: 20, bottom: 200 };
+    const L = document.querySelector(".cv-left")?.getBoundingClientRect();
+    const C = document.querySelector(".cv-cards")?.getBoundingClientRect();
+    const left = L?.width ? L.right + 24 : 230;
+    const right = C?.width ? innerWidth - C.left + 24 : Math.min(460, innerWidth * 0.34) + 70;
+    const ok = innerWidth - left - right > 240;
+    return { top: 116, bottom: 48, left: ok ? left : 40, right: ok ? right : 40 };
+  };
 
   return {
     map,
@@ -210,10 +237,9 @@ export function createHexLayer(globe, { onSelect, onHover, onRes, loadPoints, cl
       offTheme?.();
       map.off("moveend", onZoom);
       clearTimeout(pointsTimer);
-      map.off("mouseenter", "hx-fill", enter);
-      map.off("mousemove", "hx-fill", move);
-      map.off("mouseleave", "hx-fill", leave);
-      map.off("click", "hx-fill", click);
+      map.off("mousemove", move);
+      map.off("mouseout", leave);
+      map.off("click", click);
       map.off("mousemove", "pts", ptMove);
       map.off("mouseleave", "pts", leave);
       for (const src of ["hx", "hx-centers", "hx-links", "hx-sel", "area", "pts"]) map.getSource(src)?.setData(EMPTY);

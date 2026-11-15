@@ -37,11 +37,16 @@ export function initExplore(el, { globe, lenis, openCountry, totals }) {
   };
   addEventListener("wheel", onWheel, { passive: false });
 
+  // Pin the section only when the visitor scrolls into it, never while a menu link glides past it.
+  // Before pinning, the page settles exactly on the section so the picker and "Continue" are fully in view.
   const lock = () => {
-    if (locked) return;
+    if (locked || document.documentElement.classList.contains("nav-scrolling")) return;
     locked = true;
     el.classList.add("is-locked");
-    lenis?.stop();
+    if (!lenis) return;
+    const off = el.getBoundingClientRect().top;
+    if (Math.abs(off) < 2) { lenis.stop(); return; }
+    lenis.scrollTo(el, { duration: reducedMotion ? 0 : 0.45, lock: true, force: true, onComplete: () => { if (locked) lenis.stop(); } });
   };
   const unlock = (scrollNext = false) => {
     if (!locked) return;
