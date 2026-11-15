@@ -1,0 +1,76 @@
+/* Holo Atlas tokens (§4.1, §4.2). AI-assisted code — see README "Use of AI". */
+:root {
+  --bg: #03071e;
+  --bg-2: #0a0a1c;
+  --ink: #f6ebdd;          /* body text, warm white (16.9:1) */
+  --ink-2: #b9a797;        /* secondary (8.6:1) */
+  --ink-3: #8f7f72;        /* tertiary, large text only */
+  --accent: #ffba08;       /* data accent (11.7:1) */
+  --accent-soft: #ffc46b;  /* italic display word */
+  --title: #fff4e4;
+  --viirs: #7cc6ff;        /* reserved: VIIRS / 2012 marker only */
+  --ember-1: #611511;
+  --ember-2: #9a0000;
+  --ember-3: #b62602;
+  --ember-4: #e74d02;
+  --ember-5: #fcb42c;
+  --line: rgba(255, 150, 60, 0.35);
+  --line-soft: rgba(255, 170, 90, 0.16);
+  --card: rgba(20, 8, 10, 0.62);
+  --card-solid: #140a0e;
+  --card-line: rgba(255, 170, 90, 0.18);
+  --card-active: rgba(255, 186, 8, 0.5);
+  --field: rgba(255, 236, 214, 0.04);
+  --field-line: rgba(255, 190, 130, 0.22);
+  --text-shadow: 0 1px 2px rgba(3, 7, 30, 0.9), 0 0 18px rgba(3, 7, 30, 0.75);
+  --title-glow: 0 0 28px rgba(255, 186, 8, 0.55), 0 0 80px rgba(232, 93, 4, 0.45);
+  --btn-grad: linear-gradient(100deg, #faa307 0%, #e85d04 48%, #d00000 100%);
+  --btn-ink: #fffaf2;
+  --focus: #ffba08;
+  --hatch: repeating-linear-gradient(135deg, rgba(185, 167, 151, 0.35) 0 2px, transparent 2px 5px);
+  --null-bg: rgba(185, 167, 151, 0.08);
+  --shadow-card: 0 18px 40px -18px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --frame-glow: rgba(255, 120, 30, 0.22);
+
+  --f-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --f-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --gutter: clamp(16px, 4vw, 56px);
+  --topbar-h: 76px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  color-scheme: dark;
+}
+
+:root[data-theme="day"] {
+  --bg: #f5ece1;
+  --bg-2: #efe2d3;
+  --ink: #2a1210;
+  --ink-2: #7a5b4e;        /* 5.2:1 */
+  --ink-3: #8c6d5f;
+  --accent: #a34200;       /* darker data accent for light ground (5.6:1) */
+  --accent-soft: #c2410c;
+  --title: #2a1210;
+  --viirs: #1f6fb2;        /* VIIRS marker, darkened for contrast on sand */
+  --line: rgba(160, 70, 20, 0.35);
+  --line-soft: rgba(160, 70, 20, 0.14);
+  --card: rgba(255, 249, 241, 0.78);
+  --card-solid: #fff8ef;
+  --card-line: rgba(160, 70, 20, 0.2);
+  --card-active: rgba(232, 93, 4, 0.55);
+  --field: rgba(120, 50, 20, 0.04);
+  --field-line: rgba(140, 70, 30, 0.26);
+  --text-shadow: 0 1px 2px rgba(245, 236, 225, 0.9), 0 0 16px rgba(245, 236, 225, 0.8);
+  --title-glow: 0 0 30px rgba(244, 140, 6, 0.28);
+  --btn-ink: #fffaf2;
+  --focus: #c2410c;
+  --hatch: repeating-linear-gradient(135deg, rgba(122, 91, 78, 0.35) 0 2px, transparent 2px 5px);
+  --null-bg: rgba(122, 91, 78, 0.08);
+  --shadow-card: 0 18px 40px -22px rgba(120, 50, 20, 0.35), 0 2px 8px rgba(120, 50, 20, 0.08);
+  --frame-glow: rgba(244, 140, 6, 0.2);
+  color-scheme: light;
+}

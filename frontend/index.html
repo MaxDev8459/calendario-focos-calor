@@ -1,0 +1,62 @@
+<!doctype html>
+<!-- M2: lang="en", no notranslate on content. AI-assisted code — see README "Use of AI". -->
+<html lang="en" dir="ltr" data-theme="night">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Heat Atlas — See where the planet burns</title>
+    <meta name="description" content="Explore 26 years of harmonized MODIS and VIIRS satellite hotspots across the Americas: burn calendars, anomalies and CSV downloads for responders, scientists and land managers." />
+    <meta name="theme-color" content="#03071e" />
+    <meta property="og:title" content="Heat Atlas — See where the planet burns" />
+    <meta property="og:description" content="26 years of harmonized MODIS and VIIRS hotspots across the Americas. Hotspot data: NASA FIRMS. Not an official NASA product." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="./og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="./fonts/instrument-serif-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/instrument-serif-latin-400-italic.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="./css/fonts.css" />
+    <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/base.css" />
+    <link rel="stylesheet" href="./css/holo.css" />
+    <script>
+      // Theme before first paint (M21). Storage access is wrapped: it can be blocked.
+      (function () {
+        var t = null;
+        try { t = localStorage.getItem("ha-theme"); } catch (e) {}
+        if (!t) t = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "day" : "night";
+        var r = document.documentElement;
+        r.setAttribute("data-theme", t);
+        // Hide the hero copy until the intro runs; never leave it hidden if scripts fail.
+        if (!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) {
+          r.classList.add("intro-0");
+          setTimeout(function () { if (!/intro-(1|2|done)/.test(r.className)) { r.classList.remove("intro-0"); r.classList.add("intro-done"); } }, 5000);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main" data-t="skip">Skip to content</a>
+    <canvas id="waves" aria-hidden="true"></canvas>
+    <div id="globe-stage" class="globe-stage">
+      <div id="globe" class="globe" role="img" aria-label=""></div>
+      <svg id="holo-draw" class="holo-draw" aria-hidden="true"></svg>
+    </div>
+    <div id="globe-tip" class="globe-tip" role="tooltip" hidden></div>
+    <div class="frame" aria-hidden="true"></div>
+    <header id="topbar" class="topbar"></header>
+    <main id="main" tabindex="-1">
+      <section id="hero" class="hero" aria-labelledby="hero-title"></section>
+      <section id="story" class="story" aria-labelledby="story-title"></section>
+      <section id="explore" class="explore" aria-labelledby="explore-title"></section>
+      <section id="method" class="page-section method" aria-labelledby="method-title"></section>
+      <section id="data" class="page-section data" aria-labelledby="data-title"></section>
+      <section id="about" class="page-section about" aria-labelledby="about-title"></section>
+    </main>
+    <footer id="footer" class="footer"></footer>
+    <div id="country-view" class="country-view" hidden></div>
+    <div id="coming-soon" class="coming-soon" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
