@@ -1,0 +1,74 @@
+# Despliega el sitio web (frontend/) en Vercel cada vez que cambia en main.
+# Igual que vercel-api.yml: CLI de Vercel con token, desde la carpeta frontend/ (el Root Directory
+# del proyecto en Vercel se queda vacío; no lo cambies a "frontend").
+# Si frontend/index.html no existe en main, no despliega nada: así nunca publica una carpeta vacía.
+# Secretos (Settings > Secrets and variables > Actions):
+#   VERCEL_TOKEN, VERCEL_ORG_ID   los mismos de vercel-api.yml
+#   VERCEL_WEB_PROJECT_ID         ID del proyecto focos-calor-web
+name: Deploy website (Vercel)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/vercel-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-web
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the site exists
+        id: sitio
+        run: |
+          if [ -f index.html ]; then echo "listo=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::frontend/index.html is missing in main; nothing to deploy"; echo "listo=false" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/setup-node@v4
+        if: steps.sitio.outputs.listo == 'true'
+        with:
+          node-version: 22
+
+      - name: Check secrets
+        if: steps.sitio.outputs.listo == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          for v in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Missing secret for $v"; exit 1; fi
+          done
+
+      - name: Deploy to production
+        if: steps.sitio.outputs.listo == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes vercel@65.8.0 deploy --prod --yes --token "$VERCEL_TOKEN"
+
+      - name: Smoke test
+        if: steps.sitio.outputs.listo == 'true'
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "https://focos-calor-web.vercel.app/" || true)
+            echo "attempt $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::The website did not answer 200 after the deploy"; exit 1
