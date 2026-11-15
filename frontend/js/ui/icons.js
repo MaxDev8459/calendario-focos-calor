@@ -1,0 +1,27 @@
+// Authored line icons, one stroke weight. Decorative: aria-hidden.
+const s = (d, extra = "") => `<svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" ${extra}>${d}</svg>`;
+export const icons = {
+  clock: s('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  chevron: s('<path d="m6 9 6 6 6-6"/>'),
+  moon: s('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>'),
+  sun: s('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>'),
+  locate: s('<circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22"/>'),
+  arrowRight: s('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  arrowLeft: s('<path d="M19 12H5M11 6l-6 6 6 6"/>'),
+  arrowDown: s('<path d="M12 5v14M6 13l6 6 6-6"/>'),
+  plus: s('<path d="M12 5v14M5 12h14"/>'),
+  minus: s('<path d="M5 12h14"/>'),
+  download: s('<path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/>'),
+  link: s('<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/>'),
+  draw: s('<rect x="4" y="6" width="16" height="12" rx="1.5" stroke-dasharray="3 2.6"/>'),
+  calendar: s('<rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>'),
+  info: s('<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.4"/>'),
+  globe: s('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/>'),
+  close: s('<path d="M6 6l12 12M18 6 6 18"/>'),
+  menu: s('<path d="M4 8h16M4 16h16"/>'),
+  expand: s('<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>'),
+  play: s('<path d="M8 5.5v13l10.5-6.5Z"/>'),
+  stop: s('<rect x="7" y="7" width="10" height="10" rx="1.5"/>'),
+  pin: s('<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/>'),
+  sparkle: `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M50 0 C53 34 66 47 100 50 C66 53 53 66 50 100 C47 66 34 53 0 50 C34 47 47 34 50 0Z" fill="currentColor"/></svg>`,
+};
