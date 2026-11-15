@@ -32,7 +32,15 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
   let anomaly = null;
   let lastPoints = null;
 
-  const maxMonth = () => getMeta()?.ultimo_mes_completo ?? LAST_MONTH_FALLBACK;
+  // Last month the view can ask for: the recent FIRMS data (current year, refreshed daily) when it covers
+  // this country, otherwise the end of the harmonized archive. The API trims any area it does not cover.
+  const recentMonth = () => {
+    const r = getMeta()?.recientes;
+    if (!r?.hasta || !s?.name) return null;
+    const norm = (n) => String(n).replace(/_/g, " ").toLowerCase();
+    return (r.paises ?? []).some((p) => norm(p) === norm(s.name)) ? r.hasta.slice(0, 7) : null;
+  };
+  const maxMonth = () => recentMonth() ?? getMeta()?.ultimo_mes_completo ?? LAST_MONTH_FALLBACK;
 
   function buildHash() {
     const p = new URLSearchParams();
@@ -496,10 +504,11 @@ export function initCountryView(el, { globe, waves, getMeta, onClose, onSample, 
       area: f110.properties.bbox,
       areaType: "country",
       from: params.from ?? FIRST_MONTH,
-      to: params.to ?? meta?.ultimo_mes_completo ?? LAST_MONTH_FALLBACK,
+      to: params.to ?? null,
       focus: params.month ? { y: +params.month.slice(0, 4), m: +params.month.slice(5, 7) } : null,
       cell: null, cellLabel: null, cellTotal: null, last7: null,
     };
+    if (!s.to) s.to = maxMonth();
     s.dayFrom = `${s.from}-01`;
     s.dayTo = lastDay(s.to);
     if (params.bbox) { const v = validateBbox(params.bbox); if (!v.error) { s.area = v.bbox; s.areaType = "drawn"; } }

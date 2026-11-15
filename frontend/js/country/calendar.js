@@ -42,7 +42,8 @@ export function renderCalendar(el, data, opts) {
     </div>`;
   const rows = years
     .map((y) => {
-      const seam = y === VIIRS_START_YEAR - 1 ? " seam-below" : "";
+      // rows go newest first, so the line under the 2012 row sits between 2012 and 2011
+      const seam = y === VIIRS_START_YEAR ? " seam-below" : "";
       const tds = Array.from({ length: 12 }, (_, i) => {
         const m = i + 1;
         const c = cells.get(`${y}-${m}`);
