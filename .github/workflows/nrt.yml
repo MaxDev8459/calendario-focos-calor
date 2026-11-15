@@ -1,0 +1,60 @@
+# Focos recientes (FIRMS NRT): en serverless no hay tareas de fondo, así que se actualizan aquí
+# una vez al día y se publican en el release `nrt-latest`. La API los lee de ahí con DuckDB (httpfs).
+# Necesita el secreto FIRMS_MAP_KEY (Settings > Secrets and variables > Actions).
+name: Recent hotspots (FIRMS NRT)
+
+on:
+  schedule:
+    - cron: "30 7 * * *"   # todos los días a las 07:30 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nrt
+  cancel-in-progress: false
+
+env:
+  PAISES: Mexico
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Caché de las descargas de FIRMS (los días viejos no se vuelven a pedir)
+        uses: actions/cache@v4
+        with:
+          path: backend/datos_nrt/cache
+          key: firms-${{ github.run_id }}
+          restore-keys: firms-
+
+      - name: Descargar focos recientes
+        env:
+          FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
+        run: python -m app.firms --pais $PAISES
+
+      - name: Publicar en el release nrt-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view nrt-latest >/dev/null 2>&1 || \
+            gh release create nrt-latest --latest=false --title "Recent hotspots (FIRMS NRT)" \
+              --notes "VIIRS S-NPP hotspots after the archive, in the data-contract format. Updated daily by .github/workflows/nrt.yml."
+          # Primero los Parquet y al final metadata_nrt.json, que es el que la API lee para saber que hay datos.
+          gh release upload nrt-latest datos_nrt/detecciones_nrt.parquet datos_nrt/conteos_celda_mes_nrt.parquet --clobber
+          gh release upload nrt-latest datos_nrt/metadata_nrt.json --clobber
